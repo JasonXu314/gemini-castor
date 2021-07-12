@@ -1,6 +1,21 @@
 /// <reference types="@sveltejs/kit" />
 
 type Mesh = import('babylonjs').Mesh;
+type Engine = import('babylonjs').Engine;
+type LinesMesh = import('babylonjs').LinesMesh;
+type SceneOptimizer = import('babylonjs').SceneOptimizer;
+type Scene = import('babylonjs').Scene;
+type UniversalCamera = import('babylonjs').UniversalCamera;
+type HemisphericLight = import('babylonjs').HemisphericLight;
+type AbstractMesh = import('babylonjs').AbstractMesh;
+type StandardMaterial = import('babylonjs').StandardMaterial;
+type Vector3 = import('babylonjs').Vector3;
+type Color3 = import('babylonjs').Color3;
+type CloudPoint = import('babylonjs').CloudPoint;
+type PointsCloudSystem = import('babylonjs').PointsCloudSystem;
+type AdvancedDynamicTexture = import('babylonjs').AdvancedDynamicTexture;
+type Rectangle = import('babylonjs').Rectangle;
+type TextBlock = import('babylonjs').TextBlock;
 type BBox = import('rbush-3d').BBox;
 
 type EvtListener<T = undefined> = T extends undefined ? () => void : (evt: T) => void;

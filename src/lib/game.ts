@@ -1,26 +1,24 @@
-import {
-	AbstractMesh,
-	Color3,
-	Color4,
-	Engine,
-	HemisphericLight,
-	LinesMesh,
-	MeshBuilder,
-	ParticlesOptimization,
-	Scene,
-	SceneOptimizer,
-	SceneOptimizerOptions,
-	ShadowsOptimization,
-	StandardMaterial,
-	UniversalCamera,
-	Vector3
-} from 'babylonjs';
+import pkg from 'babylonjs';
 import BasePairSelectorModule from './bps';
 import EpiDataModule from './epiData';
 import RadiusSelectorModule from './radiusSelector';
 import StructureModule from './structure';
 import { EventSrc, findShortest, Logger, serializeParams2, serializeParams3 } from './utils/utils';
 import VolumeSelectorModule from './volumeSelector';
+const {
+	Color3,
+	Color4,
+	Engine,
+	HemisphericLight,
+	MeshBuilder,
+	ParticlesOptimization,
+	Scene,
+	SceneOptimizer,
+	SceneOptimizerOptions,
+	ShadowsOptimization,
+	UniversalCamera,
+	Vector3
+} = pkg;
 
 interface GameLiteEvents {
 	RESET: Sort;
