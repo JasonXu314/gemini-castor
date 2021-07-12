@@ -7,15 +7,16 @@
 	import VolumeSelectMenu from '$lib/components/menus/VolumeSelectMenu.svelte';
 	import PastSort from '$lib/components/PastSort.svelte';
 	import GameLite from '$lib/game';
-	import { decodeEpiData, decodeRefGenes, decodeStruct } from '$lib/utils/serializations';
-	import { compareSorts, EventSrc } from '$lib/utils/utils';
+	import { decodeEpiData,decodeRefGenes,decodeStruct } from '$lib/utils/serializations';
+	import { compareSorts,EventSrc } from '$lib/utils/utils';
 	import axios from 'axios';
 	import { onMount } from 'svelte';
 
+
 	// FIXME: (not a fixme) CHANGE THIS VARIABLE WHEN DEPLOYING
-	// http://gemini-backnd.herokuapp.com
+	// https://gemini-backnd.herokuapp.com
 	// http://localhost:5000
-	const BACKEND_URL = 'http://gemini-backnd.herokuapp.com';
+	const BACKEND_URL = 'https://gemini-backnd.herokuapp.com';
 
 	let canvas: HTMLCanvasElement,
 		game: GameLite,
