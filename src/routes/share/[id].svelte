@@ -15,7 +15,7 @@
 	// FIXME: (not a fixme) CHANGE THIS VARIABLE WHEN DEPLOYING
 	// http://gemini-backnd.herokuapp.com
 	// http://localhost:5000
-	const BACKEND_URL = 'http://localhost:5000';
+	const BACKEND_URL = 'http://gemini-backnd.herokuapp.com';
 
 	let canvas: HTMLCanvasElement,
 		game: GameLite,
