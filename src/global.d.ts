@@ -13,9 +13,9 @@ type Vector3 = import('babylonjs').Vector3;
 type Color3 = import('babylonjs').Color3;
 type CloudPoint = import('babylonjs').CloudPoint;
 type PointsCloudSystem = import('babylonjs').PointsCloudSystem;
-type AdvancedDynamicTexture = import('babylonjs').AdvancedDynamicTexture;
-type Rectangle = import('babylonjs').Rectangle;
-type TextBlock = import('babylonjs').TextBlock;
+type AdvancedDynamicTexture = import('babylonjs-gui').AdvancedDynamicTexture;
+type Rectangle = import('babylonjs-gui').Rectangle;
+type TextBlock = import('babylonjs-gui').TextBlock;
 type BBox = import('rbush-3d').BBox;
 
 type EvtListener<T = undefined> = T extends undefined ? () => void : (evt: T) => void;

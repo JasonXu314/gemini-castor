@@ -26,7 +26,6 @@ export default class EpiDataModule {
 	public annotationsShown: boolean;
 
 	// IDs for names
-	private currFlagID: number;
 	private currArcID: number;
 
 	// Flag Data
@@ -68,7 +67,6 @@ export default class EpiDataModule {
 		this.currentRenderedFlagData = null;
 		this.annotatedFlags = [];
 		this.flagAnnotations = new Map();
-		this.currFlagID = 0;
 
 		this.arcMeshes = null;
 		this.arcBush = new OurBush3D<ABushData>();
@@ -195,7 +193,12 @@ export default class EpiDataModule {
 			// Enable the flags that were previously disabled that are supposed to be rendered in this call
 			fitFlags.forEach((flag) => {
 				if (flag.id in this.flagMeshes && this.flagMeshes[flag.id].has(flag) && !this.flagMeshes[flag.id].get(flag).isEnabled()) {
-					this.flagMeshes[flag.id].get(flag).setEnabled(true);
+					const mesh = this.flagMeshes[flag.id].get(flag);
+					mesh.setEnabled(true);
+					const bushEntry = this.getBushEntry(mesh) as FBushData;
+					if (bushEntry.annotation) {
+						this.flagAnnotations.get(bushEntry).isVisible = true;
+					}
 				}
 			});
 
@@ -205,6 +208,10 @@ export default class EpiDataModule {
 				.forEach(([flag, mesh]) => {
 					if (!fitFlags.includes(flag) && mesh.isEnabled()) {
 						mesh.setEnabled(false);
+						const bushEntry = this.getBushEntry(mesh) as FBushData;
+						if (bushEntry.annotation) {
+							this.flagAnnotations.get(bushEntry).isVisible = false;
+						}
 					}
 				});
 		}
@@ -234,7 +241,7 @@ export default class EpiDataModule {
 			);
 			const annotation = this.unloadedAnnotations.find((ann) => ann.mesh === flagName);
 			if (annotation) {
-				this.addAnnotation(mesh, annotation.text);
+				this.addAnnotation(mesh, annotation.text, true);
 			}
 
 			// Apply optimizations
@@ -281,7 +288,12 @@ export default class EpiDataModule {
 			// Enable the arcs that were previously disabled that are supposed to be rendered in this call
 			fitArcs.forEach((arc) => {
 				if (arc.id in this.arcMeshes && this.arcMeshes[arc.id].has(arc) && !this.arcMeshes[arc.id].get(arc).isEnabled()) {
-					this.arcMeshes[arc.id].get(arc).setEnabled(true);
+					const mesh = this.arcMeshes[arc.id].get(arc);
+					mesh.setEnabled(true);
+					const bushEntry = this.getBushEntry(mesh) as ABushData;
+					if (bushEntry.annotation) {
+						this.arcAnnotations.get(bushEntry).isVisible = true;
+					}
 				}
 			});
 
@@ -291,6 +303,10 @@ export default class EpiDataModule {
 				.forEach(([arc, mesh]) => {
 					if (!fitArcs.includes(arc) && mesh.isEnabled()) {
 						mesh.setEnabled(false);
+						const bushEntry = this.getBushEntry(mesh) as ABushData;
+						if (bushEntry.annotation) {
+							this.arcAnnotations.get(bushEntry).isVisible = false;
+						}
 					}
 				});
 		}
@@ -312,8 +328,9 @@ export default class EpiDataModule {
 
 			// if the arc locus does not span more than one point
 			if (arc.startTag1 === arc.startTag2 && arc.stopTag1 === arc.stopTag2) {
+				const arcName = `arc-${this.currArcID++}`;
 				const mesh = MeshBuilder.CreateLines(
-					`arc-${arc.id in this.arcMeshes ? this.arcMeshes[arc.id].size : 0}`,
+					arcName,
 					{
 						points: arcBezier1,
 						updatable: true
@@ -321,6 +338,10 @@ export default class EpiDataModule {
 					this.scene
 				);
 				mesh.color = new Color3(1, 0.75, 0);
+				const annotation = this.unloadedAnnotations.find((ann) => ann.mesh === arcName);
+				if (annotation) {
+					this.addAnnotation(mesh, annotation.text, true);
+				}
 
 				// Optimize
 				mesh.freezeWorldMatrix();
@@ -347,8 +368,9 @@ export default class EpiDataModule {
 				const arcBezier2 = Curve3.CreateQuadraticBezier(startPoint2, controlPoint2, stopPoint1, 20).getPoints();
 
 				const pathArray = [arcBezier1, arcBezier2];
+				const arcName = `arc-${this.currArcID++}`;
 				const mesh = MeshBuilder.CreateRibbon(
-					`arc-${this.currArcID++}`,
+					arcName,
 					{
 						pathArray: pathArray,
 						sideOrientation: Mesh.DOUBLESIDE,
@@ -362,6 +384,10 @@ export default class EpiDataModule {
 				mesh.material = arcMat;
 				arcMat.freeze();
 				mesh.convertToUnIndexedMesh();
+				const annotation = this.unloadedAnnotations.find((ann) => ann.mesh === arcName);
+				if (annotation) {
+					this.addAnnotation(mesh, annotation.text, true);
+				}
 
 				// Optimize
 				mesh.freezeWorldMatrix();
