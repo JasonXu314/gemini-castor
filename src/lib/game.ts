@@ -1,4 +1,19 @@
 import pkg from 'babylonjs';
+// import {
+// 	Color3,
+// 	Color4,
+// 	Engine,
+// 	HemisphericLight,
+// 	MeshBuilder,
+// 	ParticlesOptimization,
+// 	Scene,
+// 	SceneOptimizer,
+// 	SceneOptimizerOptions,
+// 	ShadowsOptimization,
+// 	UniversalCamera,
+// 	Vector3
+// } from 'babylonjs';
+import { v4 as uuid } from 'uuid';
 import BasePairSelectorModule from './bps';
 import EpiDataModule from './epiData';
 import RadiusSelectorModule from './radiusSelector';
@@ -23,7 +38,6 @@ const {
 interface GameLiteEvents {
 	RESET: Sort;
 	ACTIVE: undefined;
-	INC_SORT: undefined;
 	START_SET_ANN_NAME: string;
 	CANCEL_SET_ANN_NAME: undefined;
 	SET_ANN_NAME: string;
@@ -73,21 +87,21 @@ export default class GameLite {
 	 * @param canvas the canvas to render on
 	 * @param rawData raw data for loading saved model
 	 */
-	constructor(private canvas: HTMLCanvasElement, private rawData: RawGameMetadata) {
+	constructor(private canvas: HTMLCanvasElement, private rawData: RawGameMetadata, initSortId: number, annotations: RawAnnotation[]) {
 		// Initialize utility stuff
 		this.logger = new Logger('Main');
 		this.engine = new Engine(canvas.getContext('webgl'));
 		this.scene = new Scene(this.engine);
 		this.running = false;
 		this.sortsActive = false;
-		this.sortsDone = 1;
+		this.sortsDone = initSortId;
 
 		// Initialize caches
 		this.structCache = {};
 		this.epiDataCache = {};
 
 		// Initialize events
-		this.events = new EventSrc(['RESET', 'ACTIVE', 'INC_SORT', 'START_SET_ANN_NAME', 'CANCEL_SET_ANN_NAME', 'SET_ANN_NAME']);
+		this.events = new EventSrc(['RESET', 'ACTIVE', 'START_SET_ANN_NAME', 'CANCEL_SET_ANN_NAME', 'SET_ANN_NAME']);
 
 		// Set up scene optimizers
 		this.optimizer = new SceneOptimizer(this.scene, optimizerOptions);
@@ -153,7 +167,7 @@ export default class GameLite {
 		this.structure = new StructureModule(rawData.structure, this.scene);
 		this.structure.generateStructData();
 		this.structure.renderStruct(this.structure.defaultStructureData);
-		this.epiData = new EpiDataModule(rawData.epiData, this.structure, this.scene);
+		this.epiData = new EpiDataModule(rawData.epiData, this.structure, this.scene, rawData.id);
 		this.epiData.generateEpiData();
 		this.epiData.renderFlags(
 			Object.values(this.epiData.flagTracks).reduce((arr, track) => [...arr, ...track.data], []),
@@ -161,15 +175,13 @@ export default class GameLite {
 		);
 		this.epiData.renderArcs(Object.values(this.epiData.arcTracks).reduce((arr, track) => [...arr, ...track.data], []));
 
+		// Loading in existing annotations
+		this.epiData.loadAnnotations(annotations);
+
 		// Initializing sort modules
 		this.radSelect = new RadiusSelectorModule(canvas, this.scene, this.structure, this.epiData, rawData.viewRegion, this);
 		this.volSelect = new VolumeSelectorModule(this.scene, this.structure, this.epiData);
 		this.bpsSelect = new BasePairSelectorModule(this.scene, this.structure, this.epiData, this.radSelect, rawData.viewRegion);
-
-		// Make frontend responsible for incrementing sort count
-		this.events.on('INC_SORT', () => {
-			this.sortsDone++;
-		});
 
 		// Add listeners for click detection
 		this.scene.onPointerDown = (evt) => {
@@ -357,6 +369,7 @@ export default class GameLite {
 	public reset(): void {
 		if (this.sortsActive) {
 			const sort: Sort = {
+				_id: uuid(),
 				name: `Sort ${this.sortsDone}`,
 				radSelect: this.radSelect.active
 					? {

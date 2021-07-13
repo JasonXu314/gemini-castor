@@ -1,4 +1,5 @@
 import pkg from 'babylonjs';
+// import { AbstractMesh, Color4, PointsCloudSystem, Vector3 } from 'babylonjs';
 import OurBush3D from './utils/ourBush';
 import { EventSrc, Logger, makePoint } from './utils/utils';
 const { AbstractMesh, Color4, Vector3, PointsCloudSystem } = pkg;

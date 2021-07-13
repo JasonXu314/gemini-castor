@@ -7,16 +7,11 @@
 	import VolumeSelectMenu from '$lib/components/menus/VolumeSelectMenu.svelte';
 	import PastSort from '$lib/components/PastSort.svelte';
 	import GameLite from '$lib/game';
-	import { decodeEpiData,decodeRefGenes,decodeStruct } from '$lib/utils/serializations';
-	import { compareSorts,EventSrc } from '$lib/utils/utils';
+	import { BACKEND_URL } from '$lib/utils/constants';
+	import { decodeEpiData, decodeRefGenes, decodeStruct } from '$lib/utils/serializations';
+	import { compareSorts, EventSrc } from '$lib/utils/utils';
 	import axios from 'axios';
 	import { onMount } from 'svelte';
-
-
-	// FIXME: (not a fixme) CHANGE THIS VARIABLE WHEN DEPLOYING
-	// https://gemini-backnd.herokuapp.com
-	// http://localhost:5000
-	const BACKEND_URL = 'https://gemini-backnd.herokuapp.com';
 
 	let canvas: HTMLCanvasElement,
 		game: GameLite,
@@ -74,19 +69,32 @@
 						});
 					})
 				]).then((stuff) => {
-					game = new GameLite(canvas, {
-						refGenes: stuff[0],
-						structure: stuff[1],
-						epiData: stuff[2],
-						viewRegion: res.data.modelData.viewRegion,
-						arcsVisible: res.data.modelData.arcsVisible,
-						flagsVisible: res.data.modelData.flagsVisible
-					});
+					game = new GameLite(
+						canvas,
+						{
+							id,
+							refGenes: stuff[0],
+							structure: stuff[1],
+							epiData: stuff[2],
+							viewRegion: res.data.modelData.viewRegion,
+							arcsVisible: res.data.modelData.arcsVisible,
+							flagsVisible: res.data.modelData.flagsVisible
+						},
+						res.data.sortHist.length + 1,
+						res.data.annotations
+					);
+					sortHist = res.data.sortHist;
 					game.start();
 					game.events.on('RESET', (sort) => {
 						if (!sortHist.some((existingSort) => compareSorts(existingSort, sort))) {
 							sortHist = [...sortHist, sort];
-							game.events.dispatch('INC_SORT');
+							axios.post<Sort[]>(`${BACKEND_URL}/history`, { sort, id }).then((res) => {
+								if (sortHist.length !== res.data.length || !sortHist.every((existingSort, i) => compareSorts(existingSort, res.data[i]))) {
+									sortHist = res.data;
+									game.sortsDone = sortHist.length + 1;
+								}
+							});
+							game.sortsDone++;
 						}
 						sortsActive = false;
 					});
@@ -97,6 +105,15 @@
 						settingAnnotation = true;
 						annotationName = defName;
 					});
+
+					setInterval(() => {
+						axios.get<Sort[]>(`${BACKEND_URL}/history?id=${id}`).then((res) => {
+							if (sortHist.length !== res.data.length || !sortHist.every((existingSort, i) => compareSorts(existingSort, res.data[i]))) {
+								sortHist = res.data;
+								game.sortsDone = sortHist.length + 1;
+							}
+						});
+					}, 5000);
 				});
 			});
 			fetching = true;
@@ -109,6 +126,35 @@
 		if (game && game.sortsActive) {
 			game.reset();
 		}
+	}
+
+	function renameSort(sort: Sort) {
+		const { _id, name } = sort;
+		axios
+			.patch<Sort[]>(`${BACKEND_URL}/history`, { id, _id, name })
+			.then((res) => {
+				sortHist = res.data;
+				game.sortsDone = sortHist.length + 1;
+			})
+			.catch(() => alert('Failed to rename sort; name will be lost on refresh'));
+	}
+
+	function delSort(sort: Sort) {
+		const backupHist = sortHist;
+		const { _id, name } = sort;
+		axios
+			.delete<Sort[]>(`${BACKEND_URL}/history`, { data: { id, _id, name } })
+			.then((res) => {
+				sortHist = res.data;
+				game.sortsDone = sortHist.length + 1;
+			})
+			.catch(() => {
+				sortHist = backupHist;
+				game.sortsDone = sortHist.length + 1;
+				alert('Failed to delete sort');
+			});
+		sortHist = sortHist.filter((sort) => sort._id !== _id);
+		game.sortsDone = sortHist.length + 1;
 	}
 </script>
 
@@ -169,8 +215,14 @@
 			<PastSort
 				{sort}
 				disabled={sortsActive}
+				on:blur={() => {
+					renameSort(sort);
+				}}
 				recall={() => {
 					events.dispatch('RECALL_SORT', sort);
+				}}
+				del={() => {
+					delSort(sort);
 				}}
 			/>
 		{/each}

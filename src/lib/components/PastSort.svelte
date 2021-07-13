@@ -3,11 +3,12 @@
 
 	export let sort: Sort;
 	export let recall: () => void;
+	export let del: () => void;
 	export let disabled: boolean;
 </script>
 
 <div class="main">
-	<input class="subtle-input" type="text" bind:value={sort.name} />
+	<input class="subtle-input" type="text" on:blur bind:value={sort.name} />
 	{#if sort.radSelect}
 		<h4>Radius Selector</h4>
 		<p>Position: ({sort.radSelect.position.x.toFixed(2)}, {sort.radSelect.position.y.toFixed(2)}, {sort.radSelect.position.z.toFixed(2)})</p>
@@ -28,6 +29,7 @@
 		<p>Radius: {sort.bpsSelect.radius}</p>
 	{/if}
 	<Button type="action" {disabled} on:click={recall}>Recall Sort</Button>
+	<Button type="cancel" {disabled} on:click={del}>Delete Sort</Button>
 </div>
 
 <style>

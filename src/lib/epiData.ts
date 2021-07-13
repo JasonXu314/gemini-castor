@@ -1,8 +1,12 @@
+import axios from 'axios';
 import pkg from 'babylonjs';
 import gui from 'babylonjs-gui';
+// import { AdvancedDynamicTexture, Rectangle, TextBlock } from 'babylonjs-gui';
 import type StructureModule from './structure';
+import { BACKEND_URL } from './utils/constants';
 import OurBush3D from './utils/ourBush';
 import { EventSrc, Logger } from './utils/utils';
+// import { AbstractMesh, Color3, Curve3, Mesh, MeshBuilder, StandardMaterial, Vector3 } from 'babylonjs';
 const { AdvancedDynamicTexture, Rectangle, TextBlock } = gui;
 const { AbstractMesh, Color3, Curve3, Mesh, MeshBuilder, StandardMaterial, Vector3 } = pkg;
 
@@ -18,6 +22,7 @@ export default class EpiDataModule {
 
 	// GUI stuff
 	private gui: AdvancedDynamicTexture;
+	private unloadedAnnotations: RawAnnotation[];
 	public annotationsShown: boolean;
 
 	// IDs for names
@@ -52,7 +57,7 @@ export default class EpiDataModule {
 	 * @param structure the structure module to be used
 	 * @param scene the scene to render in
 	 */
-	constructor(public data: RawEpiData, private structure: StructureModule, private scene: Scene) {
+	constructor(public data: RawEpiData, private structure: StructureModule, private scene: Scene, private modelId: string) {
 		this.logger = new Logger('EpiData');
 
 		this.flagMeshes = null;
@@ -79,6 +84,29 @@ export default class EpiDataModule {
 
 		this.gui = AdvancedDynamicTexture.CreateFullscreenUI('annotation-ui');
 		this.annotationsShown = true;
+		this.unloadedAnnotations = [];
+
+		setInterval(() => {
+			axios.get<RawAnnotation[]>(`${BACKEND_URL}/annotations?id=${this.modelId}`).then((res) => {
+				const serverAnnotations = res.data;
+
+				const newAnnotations = serverAnnotations.filter((ann) => {
+					const mesh = this.scene.getMeshByName(ann.mesh);
+
+					return mesh && !this.hasAnnotation(mesh);
+				});
+				const deletedAnnotations = [
+					...[...this.arcAnnotations.values()].filter((rect) => !serverAnnotations.find((ann) => ann.mesh === rect.linkedMesh.name)),
+					...[...this.flagAnnotations.values()].filter((rect) => !serverAnnotations.find((ann) => ann.mesh === rect.linkedMesh.name))
+				];
+
+				newAnnotations.forEach((ann) => {
+					const mesh = this.scene.getMeshByName(ann.mesh);
+					this.addAnnotation(mesh, ann.text, true);
+				});
+				deletedAnnotations.forEach((rect) => this.removeAnnotation(rect.linkedMesh as AbstractMesh, true));
+			});
+		}, 5000);
 
 		this.logger.log('Initialized');
 	}
@@ -193,8 +221,9 @@ export default class EpiDataModule {
 					: this.structure.data.slice(flag.startTag, flag.stopTag)
 			).map(({ x, y, z }) => new Vector3(x, y, z));
 
+			const flagName = `flag-${flag.id}`;
 			const mesh = MeshBuilder.CreateTube(
-				`flag-${this.currFlagID++}`,
+				flagName,
 				{
 					path: path,
 					radius: Math.log(flag.value + 5) * 20,
@@ -203,6 +232,10 @@ export default class EpiDataModule {
 				},
 				this.scene
 			);
+			const annotation = this.unloadedAnnotations.find((ann) => ann.mesh === flagName);
+			if (annotation) {
+				this.addAnnotation(mesh, annotation.text);
+			}
 
 			// Apply optimizations
 			mesh.freezeWorldMatrix();
@@ -212,7 +245,7 @@ export default class EpiDataModule {
 
 			const { r, g, b } = this.flagTracks[flag.id].color;
 
-			const mat = new StandardMaterial(`flag-mat-${this.currFlagID++}`, this.scene);
+			const mat = new StandardMaterial(`flag-mat-${flag.id}`, this.scene);
 			mat.diffuseColor = new Color3(r, g, b);
 			mat.freeze();
 			mesh.material = mat;
@@ -324,7 +357,7 @@ export default class EpiDataModule {
 					this.scene
 				);
 				mesh.visibility = 0.5;
-				const arcMat = new StandardMaterial(`arc-mat-${this.currArcID++}`, this.scene);
+				const arcMat = new StandardMaterial(`arc-mat-${this.currArcID}`, this.scene);
 				arcMat.diffuseColor = new Color3(1, 0.75, 0);
 				mesh.material = arcMat;
 				arcMat.freeze();
@@ -383,6 +416,7 @@ export default class EpiDataModule {
 		}
 	}
 
+	/** Gives user option to toggle off the annotation rendering */
 	public setAnnotationsShown(shown: boolean): void {
 		if (shown !== this.annotationsShown) {
 			if (!shown) {
@@ -424,14 +458,27 @@ export default class EpiDataModule {
 		);
 	}
 
-	/** Checks if a mesh is already annotat */
+	/** Attempts to create the GUI elements for the given annotations */
+	public loadAnnotations(annotations: RawAnnotation[]): void {
+		annotations.forEach((ann) => {
+			const mesh = this.scene.getMeshByName(ann.mesh);
+			if (mesh) {
+				this.addAnnotation(mesh, ann.text, true);
+			} else {
+				this.unloadedAnnotations.push(ann);
+			}
+		});
+	}
+
+	/** Checks if a mesh is already annotated */
 	public hasAnnotation(mesh: AbstractMesh): boolean {
 		const bushEntry = this.getBushEntry(mesh);
 
 		return !!bushEntry.annotation;
 	}
 
-	public addAnnotation(mesh: AbstractMesh, annotation: string): void {
+	/** Creates an annotation for the given mesh; will not notify server if doNotNotify is set */
+	public addAnnotation(mesh: AbstractMesh, annotation: string, doNotNotify: boolean = false): void {
 		const isArc = mesh.name.startsWith('arc');
 		const bushEntry = this.getBushEntry(mesh);
 
@@ -462,10 +509,34 @@ export default class EpiDataModule {
 		(isArc ? this.arcAnnotations : this.flagAnnotations).set(bushEntry, rect);
 		// @ts-ignore this is bad, but it makes the code a lot cleaner
 		(isArc ? this.annotatedArcs : this.annotatedFlags).push(bushEntry);
+
+		if (!doNotNotify) {
+			axios
+				.post<RawAnnotation[]>(`${BACKEND_URL}/annotations`, { id: this.modelId, annotation: { mesh: mesh.name, text: annotation } })
+				.then((res) => {
+					const serverAnnotations = res.data;
+
+					const newAnnotations = serverAnnotations.filter((ann) => {
+						const mesh = this.scene.getMeshByName(ann.mesh);
+
+						return mesh && !this.hasAnnotation(mesh);
+					});
+					const deletedAnnotations = [
+						...[...this.arcAnnotations.values()].filter((rect) => !serverAnnotations.find((ann) => ann.mesh === rect.linkedMesh.name)),
+						...[...this.flagAnnotations.values()].filter((rect) => !serverAnnotations.find((ann) => ann.mesh === rect.linkedMesh.name))
+					];
+
+					newAnnotations.forEach((ann) => {
+						const mesh = this.scene.getMeshByName(ann.mesh);
+						this.addAnnotation(mesh, ann.text, true);
+					});
+					deletedAnnotations.forEach((rect) => this.removeAnnotation(rect.linkedMesh as AbstractMesh, true));
+				});
+		}
 	}
 
 	/** Removes whatever annotation from the given mesh (if there is one) */
-	public removeAnnotation(mesh: AbstractMesh): void {
+	public removeAnnotation(mesh: AbstractMesh, doNotNotify: boolean = false): void {
 		const isArc = mesh.name.startsWith('arc');
 		const bushEntry = this.getBushEntry(mesh);
 
@@ -479,6 +550,33 @@ export default class EpiDataModule {
 		(isArc ? this.arcAnnotations : this.flagAnnotations).get(bushEntry).dispose();
 		// @ts-ignore this is bad, but it makes the code a lot cleaner
 		(isArc ? this.arcAnnotations : this.flagAnnotations).delete(bushEntry);
+		if (isArc) {
+			this.annotatedArcs = this.annotatedArcs.filter((data) => data !== bushEntry);
+		} else {
+			this.annotatedFlags = this.annotatedFlags.filter((data) => data !== bushEntry);
+		}
+
+		if (!doNotNotify) {
+			axios.delete<RawAnnotation[]>(`${BACKEND_URL}/annotations`, { data: { id: this.modelId, name: mesh.name } }).then((res) => {
+				const serverAnnotations = res.data;
+
+				const newAnnotations = serverAnnotations.filter((ann) => {
+					const mesh = this.scene.getMeshByName(ann.mesh);
+
+					return mesh && !this.hasAnnotation(mesh);
+				});
+				const deletedAnnotations = [
+					...[...this.arcAnnotations.values()].filter((rect) => !serverAnnotations.find((ann) => ann.mesh === rect.linkedMesh.name)),
+					...[...this.flagAnnotations.values()].filter((rect) => !serverAnnotations.find((ann) => ann.mesh === rect.linkedMesh.name))
+				];
+
+				newAnnotations.forEach((ann) => {
+					const mesh = this.scene.getMeshByName(ann.mesh);
+					this.addAnnotation(mesh, ann.text, true);
+				});
+				deletedAnnotations.forEach((rect) => this.removeAnnotation(rect.linkedMesh as AbstractMesh, true));
+			});
+		}
 	}
 
 	/** Clears the arcs */

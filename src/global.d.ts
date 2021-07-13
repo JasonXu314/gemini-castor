@@ -51,10 +51,9 @@ interface ModelData {
 interface Model {
 	_id: string;
 	name: string;
-	gltf: string;
-	bin: string;
-	textures: string[];
 	modelData: ModelData;
+	sortHist: Sort[];
+	annotations: RawAnnotation[];
 }
 
 interface RadSelectParams {
@@ -77,6 +76,7 @@ interface BPSParams {
 }
 
 interface Sort {
+	_id: string;
 	name: string;
 	radSelect: RadSelectParams | null;
 	volSelect: VolSelectParams | null;
@@ -167,6 +167,7 @@ interface RawGameMetadata {
 	viewRegion: ViewRegion;
 	flagsVisible: boolean;
 	arcsVisible: boolean;
+	id: string;
 }
 
 interface BaseBushData {
@@ -204,4 +205,9 @@ interface ArcTrackLite {
 	data: RawArcTrackData[];
 	max: number;
 	color: RawColor3;
+}
+
+interface RawAnnotation {
+	mesh: string;
+	text: string;
 }
