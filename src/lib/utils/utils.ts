@@ -1,6 +1,6 @@
-import BasePairSelectorModule from '../bps';
-import RadiusSelectorModule from '../radiusSelector';
-import VolumeSelectorModule from '../volumeSelector';
+import type BasePairSelectorModule from '../bps';
+import type RadiusSelectorModule from '../radiusSelector';
+import type VolumeSelectorModule from '../volumeSelector';
 
 type SelectorModule = VolumeSelectorModule | RadiusSelectorModule | BasePairSelectorModule;
 
@@ -220,27 +220,27 @@ export function serializeParams2(a: SelectorModule, b: SelectorModule): string {
 	let part1: string | null = null;
 	let part2: string | null = null;
 
-	if (a instanceof VolumeSelectorModule) {
+	if ('maxX' in a) {
 		part1 = `${a.maxX},${a.maxY},${a.maxZ},${a.minX},${a.minY},${a.minZ}`;
-	} else if (b instanceof VolumeSelectorModule) {
+	} else if ('maxX' in b) {
 		part2 = `${b.maxX},${b.maxY},${b.maxZ},${b.minX},${b.minY},${b.minZ}`;
 	}
-	if (a instanceof RadiusSelectorModule) {
+	if ('position' in a) {
 		if (!part1) {
 			part1 = `${a.position.x},${a.position.y},${a.position.z},${a.radius}`;
 		} else {
 			part2 = `${a.position.x},${a.position.y},${a.position.z},${a.radius}`;
 		}
-	} else if (b instanceof RadiusSelectorModule) {
+	} else if ('position' in b) {
 		if (!part1) {
 			part1 = `${b.position.x},${b.position.y},${b.position.z},${b.radius}`;
 		} else {
 			part2 = `${b.position.x},${b.position.y},${b.position.z},${b.radius}`;
 		}
 	}
-	if (a instanceof BasePairSelectorModule) {
+	if ('regions' in a) {
 		part2 = `${a.regions},${a.radius}`;
-	} else if (b instanceof BasePairSelectorModule) {
+	} else if ('regions' in b) {
 		part2 = `${b.regions},${b.radius}`;
 	}
 

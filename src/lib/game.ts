@@ -75,6 +75,7 @@ export default class GameLite {
 	public bpsSelect: BasePairSelectorModule;
 
 	// Utilities
+	private renderStructure: Promise<void> | null;
 	public events: EventSrc<GameLiteEvents>;
 	public sortsDone: number;
 
@@ -166,7 +167,7 @@ export default class GameLite {
 		// Initializing modules & generating data
 		this.structure = new StructureModule(rawData.structure, this.scene);
 		this.structure.generateStructData();
-		this.structure.renderStruct(this.structure.defaultStructureData);
+		this.renderStructure = this.structure.renderStruct(this.structure.defaultStructureData);
 		this.epiData = new EpiDataModule(rawData.epiData, this.structure, this.scene, rawData.id);
 		this.epiData.generateEpiData();
 		this.epiData.renderFlags(
@@ -477,6 +478,11 @@ export default class GameLite {
 			this.engine.stopRenderLoop();
 			this.running = false;
 		}
+	}
+
+	public async preview(): Promise<void> {
+		await this.renderStructure;
+		this.scene.render();
 	}
 
 	private getAnnotationName(defName: string): Promise<string> {

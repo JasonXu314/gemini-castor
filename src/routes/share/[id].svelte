@@ -162,8 +162,8 @@
 	<canvas
 		class="canvas"
 		bind:this={canvas}
-		width={typeof window === 'undefined' ? 1200 : window.innerWidth}
-		height={typeof window === 'undefined' ? 800 : window.innerHeight}
+		width={typeof window === 'undefined' ? 800 : window.innerWidth}
+		height={typeof window === 'undefined' ? 600 : window.innerHeight}
 	/>
 	<div class="action-menu" class:sortclosed={sortsClosed}>
 		{#if sortsClosed}
