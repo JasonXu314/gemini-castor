@@ -21,7 +21,8 @@
 		histClosed: boolean = false,
 		fetching: boolean = false,
 		settingAnnotation: boolean = false,
-		annotationName: string = '';
+		annotationName: string = '',
+		fetchInterval: number | null = null;
 	const events: EventSrc<MainEvents> = new EventSrc<MainEvents>(['RECALL_SORT']);
 	let id: string;
 
@@ -106,20 +107,22 @@
 						annotationName = defName;
 					});
 
-					setInterval(() => {
-						axios.get<Sort[]>(`${BACKEND_URL}/history?id=${id}`).then((res) => {
-							if (sortHist.length !== res.data.length || !sortHist.every((existingSort, i) => compareSorts(existingSort, res.data[i]))) {
-								sortHist = res.data;
-								game.sortsDone = sortHist.length + 1;
-							}
-						});
-					}, 5000);
+					fetchInterval = window.setInterval(fetchHistFn, 5000);
 				});
 			});
 			fetching = true;
 		} else if (!id) {
 			console.log(`Model id undefined: ${id}`);
 		}
+	}
+
+	function fetchHistFn() {
+		axios.get<Sort[]>(`${BACKEND_URL}/history?id=${id}`).then((res) => {
+			if (sortHist.length !== res.data.length || !sortHist.every((existingSort, i) => compareSorts(existingSort, res.data[i]))) {
+				sortHist = res.data;
+				game.sortsDone = sortHist.length + 1;
+			}
+		});
 	}
 
 	function clear() {
@@ -158,6 +161,13 @@
 	}
 </script>
 
+<svelte:window
+	on:sveltekit:navigation-start={() => {
+		game.stop();
+		clearInterval(fetchInterval);
+		fetchInterval = null;
+	}}
+/>
 <div class="main">
 	<canvas
 		class="canvas"

@@ -1,5 +1,5 @@
 import axios from 'axios';
-// import { AbstractMesh, Color3, Curve3, Mesh, MeshBuilder, StandardMaterial, Vector3 } from 'babylonjs';
+// import { AbstractMesh, Color3, Mesh, MeshBuilder, StandardMaterial, Vector3, VertexData } from 'babylonjs';
 import pkg from 'babylonjs';
 import gui from 'babylonjs-gui';
 // import { AdvancedDynamicTexture, Rectangle, TextBlock } from 'babylonjs-gui';
@@ -8,7 +8,7 @@ import { BACKEND_URL } from './utils/constants';
 import OurBush3D from './utils/ourBush';
 import { EventSrc, Logger } from './utils/utils';
 const { AdvancedDynamicTexture, Rectangle, TextBlock } = gui;
-const { AbstractMesh, Color3, Curve3, Mesh, MeshBuilder, StandardMaterial, Vector3 } = pkg;
+const { AbstractMesh, Color3, Curve3, Mesh, MeshBuilder, StandardMaterial, Vector3, VertexData } = pkg;
 
 interface EpiDataEvents {
 	ARC_SHOW: undefined;
@@ -30,6 +30,7 @@ export default class EpiDataModule {
 
 	// Flag Data
 	private flagMeshes: Record<number, Map<RawFlagTrackData, Mesh>> | null;
+	private flagIndexMap: Map<RawFlagTrackData, number>;
 	public flagBush: OurBush3D<FBushData>;
 	public defaultFlagData: RawFlagTrackData[] | null;
 	public flagTracks: Record<number, FlagTrackLite>;
@@ -39,7 +40,8 @@ export default class EpiDataModule {
 	public flagAnnotations: Map<FBushData, Rectangle>;
 
 	// Arc Data
-	private arcMeshes: Record<number, Map<RawArcTrackData, Mesh>> | null;
+	private arcMeshes: Record<number, Map<RawArcTrackData, RenderedArc>> | null;
+	private arcIndexMap: Map<RawArcTrackData, number>;
 	public arcBush: OurBush3D<ABushData>;
 	public defaultArcData: RawArcTrackData[] | null;
 	public arcTracks: Record<number, ArcTrackLite>;
@@ -60,6 +62,7 @@ export default class EpiDataModule {
 		this.logger = new Logger('EpiData');
 
 		this.flagMeshes = null;
+		this.flagIndexMap = new Map();
 		this.flagBush = new OurBush3D<FBushData>();
 		this.defaultFlagData = null;
 		this.flagTracks = {};
@@ -69,6 +72,7 @@ export default class EpiDataModule {
 		this.flagAnnotations = new Map();
 
 		this.arcMeshes = null;
+		this.arcIndexMap = new Map();
 		this.arcBush = new OurBush3D<ABushData>();
 		this.defaultArcData = null;
 		this.arcTracks = {};
@@ -114,7 +118,7 @@ export default class EpiDataModule {
 	 * TODO: implement k-means clustering for (hopefully) faster search times
 	 */
 	public generateEpiData(): void {
-		this.data.flags.forEach((trackData) => {
+		this.data.flags.forEach((trackData, i) => {
 			const { x: sx, y: sy, z: sz } = trackData.startPos;
 			const { x: ex, y: ey, z: ez } = trackData.stopPos;
 
@@ -141,9 +145,11 @@ export default class EpiDataModule {
 					color: { r: Math.random(), g: Math.random(), b: Math.random() }
 				};
 			}
+
+			this.flagIndexMap.set(trackData, i);
 		});
 
-		this.data.arcs.forEach((trackData) => {
+		this.data.arcs.forEach((trackData, i) => {
 			const { x: s1x, y: s1y, z: s1z } = trackData.startPos1;
 			const { x: e1x, y: e1y, z: e1z } = trackData.stopPos1;
 			const { x: s2x, y: s2y, z: s2z } = trackData.startPos2;
@@ -168,6 +174,8 @@ export default class EpiDataModule {
 			} else {
 				this.arcTracks[trackData.id] = { data: [trackData], max: trackData.score, color: { r: Math.random(), g: Math.random(), b: Math.random() } };
 			}
+
+			this.arcIndexMap.set(trackData, i);
 		});
 
 		this.defaultFlagData = this.data.flags;
@@ -183,6 +191,7 @@ export default class EpiDataModule {
 	public renderFlags(flags: RawFlagTrackData[], minVal: number = 30): void {
 		this.logger.log('Rendering Flags');
 
+		this.logger.log(this.flagTracks);
 		// Only consider flags who exceed the minVal
 		const fitFlags = flags.filter((flag) => flag.value >= (minVal / 100) * this.flagTracks[flag.id].max);
 
@@ -228,7 +237,8 @@ export default class EpiDataModule {
 					: this.structure.data.slice(flag.startTag, flag.stopTag)
 			).map(({ x, y, z }) => new Vector3(x, y, z));
 
-			const flagName = `flag-${flag.id}`;
+			const flagIndex = this.flagIndexMap.get(flag);
+			const flagName = `flag-${flagIndex}`;
 			const mesh = MeshBuilder.CreateTube(
 				flagName,
 				{
@@ -241,6 +251,7 @@ export default class EpiDataModule {
 			);
 			const annotation = this.unloadedAnnotations.find((ann) => ann.mesh === flagName);
 			if (annotation) {
+				this.unloadedAnnotations.splice(this.unloadedAnnotations.indexOf(annotation), 1);
 				this.addAnnotation(mesh, annotation.text, true);
 			}
 
@@ -252,7 +263,7 @@ export default class EpiDataModule {
 
 			const { r, g, b } = this.flagTracks[flag.id].color;
 
-			const mat = new StandardMaterial(`flag-mat-${flag.id}`, this.scene);
+			const mat = new StandardMaterial('flag-mat', this.scene);
 			mat.diffuseColor = new Color3(r, g, b);
 			mat.freeze();
 			mesh.material = mat;
@@ -287,10 +298,12 @@ export default class EpiDataModule {
 		if (this.arcMeshes) {
 			// Enable the arcs that were previously disabled that are supposed to be rendered in this call
 			fitArcs.forEach((arc) => {
-				if (arc.id in this.arcMeshes && this.arcMeshes[arc.id].has(arc) && !this.arcMeshes[arc.id].get(arc).isEnabled()) {
-					const mesh = this.arcMeshes[arc.id].get(arc);
-					mesh.setEnabled(true);
-					const bushEntry = this.getBushEntry(mesh) as ABushData;
+				if (arc.id in this.arcMeshes && this.arcMeshes[arc.id].has(arc) && !this.arcMeshes[arc.id].get(arc).enabled) {
+					const meshes = this.arcMeshes[arc.id].get(arc);
+					meshes.lines.setEnabled(true);
+					meshes.cubes.forEach((cube) => cube.setEnabled(true));
+					meshes.tris.forEach((tri) => tri.setEnabled(true));
+					const bushEntry = this.getBushEntry(meshes.lines) as ABushData;
 					if (bushEntry.annotation) {
 						this.arcAnnotations.get(bushEntry).isVisible = true;
 					}
@@ -299,11 +312,14 @@ export default class EpiDataModule {
 
 			// Disable the arcs that were previously enabled that are NOT supposed to be rendered in this call
 			Object.values(this.arcMeshes)
-				.reduce<[RawArcTrackData, Mesh][]>((arr, map) => [...arr, ...map.entries()], [])
+				.reduce<[RawArcTrackData, RenderedArc][]>((arr, map) => [...arr, ...map.entries()], [])
 				.forEach(([arc, mesh]) => {
-					if (!fitArcs.includes(arc) && mesh.isEnabled()) {
-						mesh.setEnabled(false);
-						const bushEntry = this.getBushEntry(mesh) as ABushData;
+					if (!fitArcs.includes(arc) && mesh.enabled) {
+						mesh.enabled = false;
+						mesh.lines.setEnabled(false);
+						mesh.cubes.forEach((cube) => cube.setEnabled(false));
+						mesh.tris.forEach((tri) => tri.setEnabled(false));
+						const bushEntry = this.getBushEntry(mesh.lines) as ABushData;
 						if (bushEntry.annotation) {
 							this.arcAnnotations.get(bushEntry).isVisible = false;
 						}
@@ -316,91 +332,128 @@ export default class EpiDataModule {
 		}
 
 		newArcs.forEach((arc) => {
-			// Define control point to use in bezier curve
-			const controlPoint1 = new Vector3(
-				(arc.startPos1.x + arc.stopPos2.x) / 2,
-				(arc.startPos1.y + arc.stopPos2.y) / 2,
-				(arc.startPos1.z + arc.stopPos2.z) / 2
-			);
-			const startPoint1 = new Vector3(arc.startPos1.x, arc.startPos1.y, arc.startPos1.z);
-			const stopPoint2 = new Vector3(arc.stopPos2.x, arc.stopPos2.y, arc.stopPos2.z);
-			const arcBezier1 = Curve3.CreateQuadraticBezier(startPoint1, controlPoint1, stopPoint2, 20).getPoints();
-
 			// if the arc locus does not span more than one point
-			if (arc.startTag1 === arc.startTag2 && arc.stopTag1 === arc.stopTag2) {
-				const arcName = `arc-${this.currArcID++}`;
-				const mesh = MeshBuilder.CreateLines(
-					arcName,
+			const sbp = arc.startTag1 === arc.startTag2;
+			const startPoint1 = new Vector3(arc.startPos1.x, arc.startPos1.y, arc.startPos1.z);
+			const stopPoint1 = new Vector3(arc.stopPos1.x, arc.stopPos1.y, arc.stopPos1.z);
+			const startPoint2 = sbp ? null : new Vector3(arc.startPos2.x, arc.startPos2.y, arc.startPos2.z);
+			const stopPoint2 = sbp ? null : new Vector3(arc.stopPos2.x, arc.stopPos2.y, arc.stopPos2.z);
+			const midPoint = sbp
+				? null
+				: new Vector3(
+						(startPoint1.x + startPoint2.x + stopPoint1.x + stopPoint2.x) / 4,
+						(startPoint1.y + startPoint2.y + stopPoint1.y + stopPoint2.y) / 4,
+						(startPoint1.z + startPoint2.z + stopPoint1.z + stopPoint2.z) / 4
+				  );
+			const startJoint = sbp
+				? null
+				: new Vector3(
+						(startPoint1.x + startPoint2.x + midPoint.x) / 3,
+						(startPoint1.y + startPoint2.y + midPoint.y) / 3,
+						(startPoint1.z + startPoint2.z + midPoint.z) / 3
+				  );
+			const stopJoint = sbp
+				? null
+				: new Vector3(
+						(stopPoint1.x + stopPoint2.x + midPoint.x) / 3,
+						(stopPoint1.y + stopPoint2.y + midPoint.y) / 3,
+						(stopPoint1.z + stopPoint2.z + midPoint.z) / 3
+				  );
+
+			const lines = sbp ? [startPoint1, stopPoint1] : [startJoint, stopJoint];
+			const cubes = sbp ? [startPoint1, stopPoint1] : [startPoint1, startPoint2, stopPoint1, stopPoint2];
+			const triangles = sbp
+				? []
+				: [
+						[startPoint1, startJoint, startPoint2],
+						[stopPoint1, stopJoint, stopPoint2]
+				  ];
+			const arcIndex = this.arcIndexMap.get(arc);
+
+			const linesName = `arc-${arcIndex}-lines`;
+			const linesMesh = MeshBuilder.CreateLines(
+				linesName,
+				{
+					points: lines,
+					updatable: true
+				},
+				this.scene
+			);
+			linesMesh.isPickable = false;
+			const annotation = this.unloadedAnnotations.find((ann) => ann.mesh === linesName);
+			if (annotation) {
+				this.unloadedAnnotations.splice(this.unloadedAnnotations.indexOf(annotation), 1);
+				this.addAnnotation(linesMesh, annotation.text, true);
+			}
+			const { r: lmr, g: lmg, b: lmb } = this.arcTracks[arc.id].color;
+			linesMesh.color = new Color3(lmr, lmg, lmb);
+			// Optimize
+			// mesh.freezeWorldMatrix();
+			// mesh.doNotSyncBoundingInfo = true;
+			// mesh.convertToUnIndexedMesh();
+			// mesh.cullingStrategy = BABYLON.AbstractMesh.CULLINGSTRATEGY_BOUNDINGSPHERE_ONLY;
+
+			const cubeMeshes = cubes.map((cube, i) => {
+				const cubeName = `arc-${arcIndex}-cube-${i}`;
+				const cubeMesh = MeshBuilder.CreateBox(
+					cubeName,
 					{
-						points: arcBezier1,
+						size: 50,
 						updatable: true
 					},
 					this.scene
 				);
-				mesh.color = new Color3(1, 0.75, 0);
-				const annotation = this.unloadedAnnotations.find((ann) => ann.mesh === arcName);
+				cubeMesh.position = cube;
+
+				const mat = new StandardMaterial('arc-cube-mat', this.scene);
+				cubeMesh.material = mat;
+
+				const annotation = this.unloadedAnnotations.find((ann) => ann.mesh === cubeName);
 				if (annotation) {
-					this.addAnnotation(mesh, annotation.text, true);
+					this.unloadedAnnotations.splice(this.unloadedAnnotations.indexOf(annotation), 1);
+					this.addAnnotation(cubeMesh, annotation.text, true);
 				}
 
-				// Optimize
-				mesh.freezeWorldMatrix();
-				mesh.doNotSyncBoundingInfo = true;
-				mesh.convertToUnIndexedMesh();
-				mesh.cullingStrategy = BABYLON.AbstractMesh.CULLINGSTRATEGY_BOUNDINGSPHERE_ONLY;
+				return cubeMesh;
+			});
 
-				// Update meshes so they can be disposed later
-				if (arc.id in this.arcMeshes) {
-					this.arcMeshes[arc.id].set(arc, mesh);
-				} else {
-					this.arcMeshes[arc.id] = new Map([[arc, mesh]]);
+			const tris = triangles.map((tri, i) => {
+				const triName = `arc-${arcIndex}-tri-${i}`;
+				const triMesh = new Mesh(triName, this.scene);
+				const pos = [tri[0].x, tri[0].y, tri[0].z, tri[1].x, tri[1].y, tri[1].z, tri[2].x, tri[2].y, tri[2].z];
+				const ind = [0, 1, 2];
+				const norm = [];
+				const vertData = new VertexData();
+				VertexData.ComputeNormals(pos, ind, norm);
+				vertData.positions = pos;
+				vertData.indices = ind;
+				vertData.normals = norm;
+				vertData.applyToMesh(triMesh);
+
+				const mat = new StandardMaterial('arc-tri-mat', this.scene);
+				triMesh.material = mat;
+
+				const annotation = this.unloadedAnnotations.find((ann) => ann.mesh === triName);
+				if (annotation) {
+					this.unloadedAnnotations.splice(this.unloadedAnnotations.indexOf(annotation), 1);
+					this.addAnnotation(triMesh, annotation.text, true);
 				}
+
+				return triMesh;
+			});
+
+			const renderedArc: RenderedArc = {
+				enabled: true,
+				cubes: cubeMeshes,
+				lines: linesMesh,
+				tris
+			};
+
+			// Update meshes so they can be disposed later
+			if (arc.id in this.arcMeshes) {
+				this.arcMeshes[arc.id].set(arc, renderedArc);
 			} else {
-				// if the arc locus spans more than one point
-				// stop1 => start2
-				const controlPoint2 = new Vector3(
-					(arc.startPos2.x + arc.stopPos1.x) / 2,
-					(arc.startPos2.y + arc.stopPos1.y) / 2,
-					(arc.startPos2.z + arc.stopPos1.z) / 2
-				);
-				const startPoint2 = new Vector3(arc.startPos2.x, arc.startPos2.y, arc.startPos2.z);
-				const stopPoint1 = new Vector3(arc.stopPos1.x, arc.stopPos1.y, arc.stopPos1.z);
-				const arcBezier2 = Curve3.CreateQuadraticBezier(startPoint2, controlPoint2, stopPoint1, 20).getPoints();
-
-				const pathArray = [arcBezier1, arcBezier2];
-				const arcName = `arc-${this.currArcID++}`;
-				const mesh = MeshBuilder.CreateRibbon(
-					arcName,
-					{
-						pathArray: pathArray,
-						sideOrientation: Mesh.DOUBLESIDE,
-						updatable: true
-					},
-					this.scene
-				);
-				mesh.visibility = 0.5;
-				const arcMat = new StandardMaterial(`arc-mat-${this.currArcID}`, this.scene);
-				arcMat.diffuseColor = new Color3(1, 0.75, 0);
-				mesh.material = arcMat;
-				arcMat.freeze();
-				mesh.convertToUnIndexedMesh();
-				const annotation = this.unloadedAnnotations.find((ann) => ann.mesh === arcName);
-				if (annotation) {
-					this.addAnnotation(mesh, annotation.text, true);
-				}
-
-				// Optimize
-				mesh.freezeWorldMatrix();
-				mesh.doNotSyncBoundingInfo = true;
-				mesh.convertToUnIndexedMesh();
-				mesh.cullingStrategy = BABYLON.AbstractMesh.CULLINGSTRATEGY_BOUNDINGSPHERE_ONLY;
-
-				// Update meshes so they can be disposed later
-				if (arc.id in this.arcMeshes) {
-					this.arcMeshes[arc.id].set(arc, mesh);
-				} else {
-					this.arcMeshes[arc.id] = new Map([[arc, mesh]]);
-				}
+				this.arcMeshes[arc.id] = new Map([[arc, renderedArc]]);
 			}
 		});
 
@@ -430,8 +483,11 @@ export default class EpiDataModule {
 		if (shown !== this.arcsShown) {
 			if (!shown) {
 				Object.values(this.arcMeshes).forEach((track) => {
-					[...track.values()].forEach((mesh) => {
-						mesh.setEnabled(false);
+					[...track.values()].forEach((renderedArc) => {
+						renderedArc.enabled = false;
+						renderedArc.cubes.forEach((cube) => cube.setEnabled(false));
+						renderedArc.tris.forEach((tri) => tri.setEnabled(false));
+						renderedArc.lines.setEnabled(false);
 					});
 				});
 				this.arcsShown = false;
@@ -477,9 +533,18 @@ export default class EpiDataModule {
 				.search({ maxX, maxY, maxZ, minX, minY, minZ })
 				// @ts-ignore this is bad, but it makes the code a lot cleaner
 				.find((entry) => {
-					const arc = entry.raw;
+					const rawEntry = entry.raw;
 
-					return (isArc ? this.arcMeshes : this.flagMeshes)[arc.id].get(arc) === mesh;
+					if (isArc) {
+						const type = mesh.name.includes('lines') ? 'lines' : mesh.name.includes('cube') ? 'cubes' : 'tris';
+						if (type === 'lines') {
+							return this.arcMeshes[rawEntry.id].get(rawEntry).lines === mesh;
+						} else {
+							return this.arcMeshes[rawEntry.id].get(rawEntry)[type].includes(mesh as Mesh);
+						}
+					} else {
+						return this.flagMeshes[rawEntry.id].get(rawEntry) === mesh;
+					}
 				}) as ABushData | FBushData
 		);
 	}
@@ -609,8 +674,10 @@ export default class EpiDataModule {
 	public clearArcs(): void {
 		this.logger.log('Clearing Arcs');
 		for (const i in this.arcMeshes) {
-			this.arcMeshes[i].forEach((mesh) => {
-				mesh.dispose();
+			this.arcMeshes[i].forEach((renderedArc) => {
+				renderedArc.lines.dispose();
+				renderedArc.cubes.forEach((cube) => cube.dispose());
+				renderedArc.tris.forEach((tri) => tri.dispose());
 			});
 		}
 		this.arcMeshes = null;

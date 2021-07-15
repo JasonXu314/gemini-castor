@@ -211,3 +211,10 @@ interface RawAnnotation {
 	mesh: string;
 	text: string;
 }
+
+interface RenderedArc {
+	lines: Mesh;
+	cubes: Mesh[];
+	tris: Mesh[];
+	enabled: boolean;
+}

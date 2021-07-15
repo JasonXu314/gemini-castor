@@ -88,7 +88,7 @@ export default class GameLite {
 	 * @param canvas the canvas to render on
 	 * @param rawData raw data for loading saved model
 	 */
-	constructor(private canvas: HTMLCanvasElement, private rawData: RawGameMetadata, initSortId: number, annotations: RawAnnotation[]) {
+	constructor(private canvas: HTMLCanvasElement, public rawData: RawGameMetadata, initSortId: number, annotations: RawAnnotation[]) {
 		// Initialize utility stuff
 		this.logger = new Logger('Main');
 		this.engine = new Engine(canvas.getContext('webgl'));
@@ -172,12 +172,14 @@ export default class GameLite {
 		this.epiData.generateEpiData();
 		this.epiData.renderFlags(
 			Object.values(this.epiData.flagTracks).reduce((arr, track) => [...arr, ...track.data], []),
-			99
+			80
 		);
 		this.epiData.renderArcs(Object.values(this.epiData.arcTracks).reduce((arr, track) => [...arr, ...track.data], []));
 
 		// Loading in existing annotations
-		this.epiData.loadAnnotations(annotations);
+		setTimeout(() => {
+			this.epiData.loadAnnotations(annotations);
+		}, 0);
 
 		// Initializing sort modules
 		this.radSelect = new RadiusSelectorModule(canvas, this.scene, this.structure, this.epiData, rawData.viewRegion, this);
@@ -478,6 +480,14 @@ export default class GameLite {
 			this.engine.stopRenderLoop();
 			this.running = false;
 		}
+	}
+
+	public destroy(): void {
+		if (this.running) {
+			this.stop();
+		}
+		this.engine.dispose();
+		this.scene.dispose();
 	}
 
 	public async preview(): Promise<void> {
