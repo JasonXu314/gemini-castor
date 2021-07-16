@@ -214,7 +214,7 @@ export default class VolumeSelectorModule {
 			const epiDataSelect = this.selectEpiData();
 			this.structure.renderStruct(this.selectStructure());
 			this.epiData.renderArcs(epiDataSelect.arcs);
-			this.epiData.renderFlags(epiDataSelect.flags, 99);
+			this.epiData.renderFlags(epiDataSelect.flags, 80);
 		}
 	}
 

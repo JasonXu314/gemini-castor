@@ -213,7 +213,7 @@ export default class BasePairSelectorModule {
 			this.structure.renderStruct(this.selectStructure());
 			const epiDataResults = this.selectEpiData();
 			this.epiData.renderArcs(epiDataResults.arcs);
-			this.epiData.renderFlags(epiDataResults.flags, 99);
+			this.epiData.renderFlags(epiDataResults.flags, 80);
 			this.active = true;
 		}
 	}

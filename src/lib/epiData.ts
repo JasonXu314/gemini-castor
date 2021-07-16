@@ -300,6 +300,7 @@ export default class EpiDataModule {
 			fitArcs.forEach((arc) => {
 				if (arc.id in this.arcMeshes && this.arcMeshes[arc.id].has(arc) && !this.arcMeshes[arc.id].get(arc).enabled) {
 					const meshes = this.arcMeshes[arc.id].get(arc);
+					meshes.enabled = true;
 					meshes.lines.setEnabled(true);
 					meshes.cubes.forEach((cube) => cube.setEnabled(true));
 					meshes.tris.forEach((tri) => tri.setEnabled(true));
@@ -528,22 +529,30 @@ export default class EpiDataModule {
 		const { x: minX, y: minY, z: minZ } = bounds.minimumWorld;
 		const isArc = mesh.name.startsWith('arc');
 
+		this.logger.log((isArc ? this.arcBush : this.flagBush).search({ maxX, maxY, maxZ, minX, minY, minZ }).length);
+
 		return (
 			(isArc ? this.arcBush : this.flagBush)
 				.search({ maxX, maxY, maxZ, minX, minY, minZ })
 				// @ts-ignore this is bad, but it makes the code a lot cleaner
-				.find((entry) => {
+				.find((entry: ABushData | FBushData) => {
 					const rawEntry = entry.raw;
 
 					if (isArc) {
 						const type = mesh.name.includes('lines') ? 'lines' : mesh.name.includes('cube') ? 'cubes' : 'tris';
+
+						// Sometimes, selection is imprecise (ie. includes data that isn't rendered), exclude those
+						const renderedArc = this.arcMeshes[rawEntry.id].get(rawEntry as RawArcTrackData);
+						if (!renderedArc) {
+							return false;
+						}
 						if (type === 'lines') {
-							return this.arcMeshes[rawEntry.id].get(rawEntry).lines === mesh;
+							return renderedArc.lines === mesh;
 						} else {
-							return this.arcMeshes[rawEntry.id].get(rawEntry)[type].includes(mesh as Mesh);
+							return renderedArc[type].includes(mesh as Mesh);
 						}
 					} else {
-						return this.flagMeshes[rawEntry.id].get(rawEntry) === mesh;
+						return this.flagMeshes[rawEntry.id].get(rawEntry as RawFlagTrackData) === mesh;
 					}
 				}) as ABushData | FBushData
 		);

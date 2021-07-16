@@ -174,7 +174,8 @@ export default class GameLite {
 			Object.values(this.epiData.flagTracks).reduce((arr, track) => [...arr, ...track.data], []),
 			80
 		);
-		this.epiData.renderArcs(Object.values(this.epiData.arcTracks).reduce((arr, track) => [...arr, ...track.data], []));
+		// this.epiData.renderArcs(Object.values(this.epiData.arcTracks).reduce((arr, track) => [...arr, ...track.data], []));
+		this.epiData.renderArcs(this.epiData.defaultArcData);
 
 		// Loading in existing annotations
 		setTimeout(() => {
@@ -309,7 +310,7 @@ export default class GameLite {
 			this.logger.time('Rendering');
 			this.structure.renderStruct(finalCoords);
 			this.epiData.renderArcs(finalEpi.arcs);
-			this.epiData.renderFlags(finalEpi.flags, 99);
+			this.epiData.renderFlags(finalEpi.flags, 80);
 			this.logger.timeEnd('Rendering');
 
 			this.sortsActive = true;
@@ -361,7 +362,7 @@ export default class GameLite {
 			}
 
 			this.epiData.renderArcs(finalEpi.arcs);
-			this.epiData.renderFlags(finalEpi.flags, 99);
+			this.epiData.renderFlags(finalEpi.flags, 80);
 
 			this.sortsActive = true;
 			this.events.dispatch('ACTIVE');
@@ -416,7 +417,7 @@ export default class GameLite {
 			this.bpsSelect.reset();
 			this.structure.renderStruct(this.structure.defaultStructureData);
 			this.epiData.renderArcs(this.epiData.defaultArcData);
-			this.epiData.renderFlags(this.epiData.defaultFlagData, 99);
+			this.epiData.renderFlags(this.epiData.defaultFlagData, 80);
 			this.sortsActive = false;
 
 			this.events.dispatch('RESET', sort);
@@ -492,7 +493,9 @@ export default class GameLite {
 
 	public async preview(): Promise<void> {
 		await this.renderStructure;
-		this.scene.render();
+		setTimeout(() => {
+			this.scene.render();
+		}, 0);
 	}
 
 	private getAnnotationName(defName: string): Promise<string> {
