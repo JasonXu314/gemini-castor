@@ -9,6 +9,7 @@
 	import GameLite from '$lib/game';
 	import { BACKEND_URL } from '$lib/utils/constants';
 	import { decodeEpiData, decodeRefGenes, decodeStruct } from '$lib/utils/serializations';
+	import MySocket from '$lib/utils/sock';
 	import { compareSorts, EventSrc } from '$lib/utils/utils';
 	import axios from 'axios';
 	import { onMount } from 'svelte';
@@ -22,7 +23,7 @@
 		fetching: boolean = false,
 		settingAnnotation: boolean = false,
 		annotationName: string = '',
-		fetchInterval: number | null = null;
+		socketId: string;
 	const events: EventSrc<MainEvents> = new EventSrc<MainEvents>(['RECALL_SORT']);
 	let id: string;
 
@@ -34,7 +35,7 @@
 
 	function tryFetch() {
 		if (id && !game && !fetching) {
-			axios.get<Model>(`${BACKEND_URL}/models/${id}`).then((res) => {
+			axios.get<Model & { socketId: string }>(`${BACKEND_URL}/models/${id}`).then((res) => {
 				Promise.all([
 					axios.get<Blob>(`${BACKEND_URL}/${id}.gref`, { responseType: 'blob' }).then((res) => {
 						return new Promise<RawRefGene[]>((resolve) => {
@@ -89,12 +90,7 @@
 					game.events.on('RESET', (sort) => {
 						if (!sortHist.some((existingSort) => compareSorts(existingSort, sort))) {
 							sortHist = [...sortHist, sort];
-							axios.post<Sort[]>(`${BACKEND_URL}/history`, { sort, id }).then((res) => {
-								if (sortHist.length !== res.data.length || !sortHist.every((existingSort, i) => compareSorts(existingSort, res.data[i]))) {
-									sortHist = res.data;
-									game.sortsDone = sortHist.length + 1;
-								}
-							});
+							axios.post<Sort[]>(`${BACKEND_URL}/history`, { sort, id });
 							game.sortsDone++;
 						}
 						sortsActive = false;
@@ -107,22 +103,49 @@
 						annotationName = defName;
 					});
 
-					fetchInterval = window.setInterval(fetchHistFn, 5000);
+					const mainSock = new MySocket<SocketReceiveMsgs, SocketSendMsgs>(BACKEND_URL.replace('http', 'ws'), [
+						'ANN_ADD',
+						'ANN_DEL',
+						'HIST_ADD',
+						'HIST_DEL',
+						'HIST_EDIT'
+					]);
+
+					mainSock.send({ type: 'LINK', id: res.data.socketId, roomId: id });
+
+					mainSock.on('HIST_ADD', ({ newSort }) => {
+						if (!sortHist.some((existingSort) => compareSorts(existingSort, newSort))) {
+							sortHist = [...sortHist, newSort];
+							game.sortsDone++;
+						}
+					});
+
+					mainSock.on('HIST_DEL', ({ id }) => {
+						sortHist = sortHist.filter((sort) => sort._id !== id);
+					});
+
+					mainSock.on('HIST_EDIT', ({ id, name }) => {
+						sortHist = sortHist.map((sort) => {
+							if (sort._id === id) {
+								sort.name = name;
+							}
+							return sort;
+						});
+					});
+
+					mainSock.on('ANN_ADD', ({ newAnnotation }) => {
+						game.epiData.addRawAnnotation(newAnnotation);
+					});
+
+					mainSock.on('ANN_DEL', ({ mesh }) => {
+						game.epiData.removeRawAnnotation(mesh);
+					});
 				});
 			});
 			fetching = true;
 		} else if (!id) {
 			console.log(`Model id undefined: ${id}`);
 		}
-	}
-
-	function fetchHistFn() {
-		axios.get<Sort[]>(`${BACKEND_URL}/history?id=${id}`).then((res) => {
-			if (sortHist.length !== res.data.length || !sortHist.every((existingSort, i) => compareSorts(existingSort, res.data[i]))) {
-				sortHist = res.data;
-				game.sortsDone = sortHist.length + 1;
-			}
-		});
 	}
 
 	function clear() {
@@ -133,39 +156,18 @@
 
 	function renameSort(sort: Sort) {
 		const { _id, name } = sort;
-		axios
-			.patch<Sort[]>(`${BACKEND_URL}/history`, { id, _id, name })
-			.then((res) => {
-				sortHist = res.data;
-				game.sortsDone = sortHist.length + 1;
-			})
-			.catch(() => alert('Failed to rename sort; name will be lost on refresh'));
+		axios.patch<Sort[]>(`${BACKEND_URL}/history`, { id, _id, name }).catch(() => alert('Failed to rename sort; name will be lost on refresh'));
 	}
 
 	function delSort(sort: Sort) {
-		const backupHist = sortHist;
 		const { _id, name } = sort;
-		axios
-			.delete<Sort[]>(`${BACKEND_URL}/history`, { data: { id, _id, name } })
-			.then((res) => {
-				sortHist = res.data;
-				game.sortsDone = sortHist.length + 1;
-			})
-			.catch(() => {
-				sortHist = backupHist;
-				game.sortsDone = sortHist.length + 1;
-				alert('Failed to delete sort');
-			});
-		sortHist = sortHist.filter((sort) => sort._id !== _id);
-		game.sortsDone = sortHist.length + 1;
+		axios.delete<Sort[]>(`${BACKEND_URL}/history`, { data: { id, _id, name } }).catch(() => alert('Failed to delete sort'));
 	}
 </script>
 
 <svelte:window
 	on:sveltekit:navigation-start={() => {
 		game.stop();
-		clearInterval(fetchInterval);
-		fetchInterval = null;
 	}}
 />
 <div class="main">

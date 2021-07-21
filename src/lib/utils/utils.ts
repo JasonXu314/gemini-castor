@@ -166,7 +166,7 @@ export class EventSrc<T extends Record<string, any | undefined>> {
 	 * Triggers the listeners for the event
 	 * @param event the event to trigger
 	 */
-	public dispatch<E extends keyof T>(event: E, ...data: Parameters<ListenerMap<T>[E][0]>): void {
+	public dispatch<E extends keyof T>(event: E, ...data: Parameters<EvtListener<T[E]>>): void {
 		this._listeners[event].forEach((listener: T[E][0]) => (data ? listener(...data) : listener()));
 	}
 }

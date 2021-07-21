@@ -1,14 +1,14 @@
 import axios from 'axios';
-// import { AbstractMesh, Color3, Mesh, MeshBuilder, StandardMaterial, Vector3, VertexData } from 'babylonjs';
-import pkg from 'babylonjs';
-import gui from 'babylonjs-gui';
-// import { AdvancedDynamicTexture, Rectangle, TextBlock } from 'babylonjs-gui';
+import { AbstractMesh, Color3, Mesh, MeshBuilder, StandardMaterial, Vector3, VertexData } from 'babylonjs';
+// import pkg from 'babylonjs';
+// import gui from 'babylonjs-gui';
+import { AdvancedDynamicTexture, Rectangle, TextBlock } from 'babylonjs-gui';
 import type StructureModule from './structure';
 import { BACKEND_URL } from './utils/constants';
 import OurBush3D from './utils/ourBush';
 import { EventSrc, Logger } from './utils/utils';
-const { AdvancedDynamicTexture, Rectangle, TextBlock } = gui;
-const { AbstractMesh, Color3, Curve3, Mesh, MeshBuilder, StandardMaterial, Vector3, VertexData } = pkg;
+// const { AdvancedDynamicTexture, Rectangle, TextBlock } = gui;
+// const { AbstractMesh, Color3, Curve3, Mesh, MeshBuilder, StandardMaterial, Vector3, VertexData } = pkg;
 
 interface EpiDataEvents {
 	ARC_SHOW: undefined;
@@ -87,28 +87,6 @@ export default class EpiDataModule {
 		this.gui = AdvancedDynamicTexture.CreateFullscreenUI('annotation-ui');
 		this.annotationsShown = true;
 		this.unloadedAnnotations = [];
-
-		setInterval(() => {
-			axios.get<RawAnnotation[]>(`${BACKEND_URL}/annotations?id=${this.modelId}`).then((res) => {
-				const serverAnnotations = res.data;
-
-				const newAnnotations = serverAnnotations.filter((ann) => {
-					const mesh = this.scene.getMeshByName(ann.mesh);
-
-					return mesh && !this.hasAnnotation(mesh);
-				});
-				const deletedAnnotations = [
-					...[...this.arcAnnotations.values()].filter((rect) => !serverAnnotations.find((ann) => ann.mesh === rect.linkedMesh.name)),
-					...[...this.flagAnnotations.values()].filter((rect) => !serverAnnotations.find((ann) => ann.mesh === rect.linkedMesh.name))
-				];
-
-				newAnnotations.forEach((ann) => {
-					const mesh = this.scene.getMeshByName(ann.mesh);
-					this.addAnnotation(mesh, ann.text, true);
-				});
-				deletedAnnotations.forEach((rect) => this.removeAnnotation(rect.linkedMesh as AbstractMesh, true));
-			});
-		}, 5000);
 
 		this.logger.log('Initialized');
 	}
@@ -191,7 +169,6 @@ export default class EpiDataModule {
 	public renderFlags(flags: RawFlagTrackData[], minVal: number = 30): void {
 		this.logger.log('Rendering Flags');
 
-		this.logger.log(this.flagTracks);
 		// Only consider flags who exceed the minVal
 		const fitFlags = flags.filter((flag) => flag.value >= (minVal / 100) * this.flagTracks[flag.id].max);
 
@@ -529,8 +506,6 @@ export default class EpiDataModule {
 		const { x: minX, y: minY, z: minZ } = bounds.minimumWorld;
 		const isArc = mesh.name.startsWith('arc');
 
-		this.logger.log((isArc ? this.arcBush : this.flagBush).search({ maxX, maxY, maxZ, minX, minY, minZ }).length);
-
 		return (
 			(isArc ? this.arcBush : this.flagBush)
 				.search({ maxX, maxY, maxZ, minX, minY, minZ })
@@ -568,6 +543,23 @@ export default class EpiDataModule {
 				this.unloadedAnnotations.push(ann);
 			}
 		});
+	}
+
+	/** Attempts to create the GUI elements for the given annotation */
+	public addRawAnnotation(annotation: RawAnnotation): void {
+		const mesh = this.scene.getMeshByName(annotation.mesh);
+		if (mesh && !this.hasAnnotation(mesh)) {
+			this.addAnnotation(mesh, annotation.text, true);
+		} else {
+			this.unloadedAnnotations.push(annotation);
+		}
+	}
+
+	public removeRawAnnotation(meshName: string): void {
+		const mesh = this.scene.getMeshByName(meshName);
+		if (mesh && this.hasAnnotation(mesh)) {
+			this.removeAnnotation(mesh, true);
+		}
 	}
 
 	/** Checks if a mesh is already annotated */
@@ -611,27 +603,7 @@ export default class EpiDataModule {
 		(isArc ? this.annotatedArcs : this.annotatedFlags).push(bushEntry);
 
 		if (!doNotNotify) {
-			axios
-				.post<RawAnnotation[]>(`${BACKEND_URL}/annotations`, { id: this.modelId, annotation: { mesh: mesh.name, text: annotation } })
-				.then((res) => {
-					const serverAnnotations = res.data;
-
-					const newAnnotations = serverAnnotations.filter((ann) => {
-						const mesh = this.scene.getMeshByName(ann.mesh);
-
-						return mesh && !this.hasAnnotation(mesh);
-					});
-					const deletedAnnotations = [
-						...[...this.arcAnnotations.values()].filter((rect) => !serverAnnotations.find((ann) => ann.mesh === rect.linkedMesh.name)),
-						...[...this.flagAnnotations.values()].filter((rect) => !serverAnnotations.find((ann) => ann.mesh === rect.linkedMesh.name))
-					];
-
-					newAnnotations.forEach((ann) => {
-						const mesh = this.scene.getMeshByName(ann.mesh);
-						this.addAnnotation(mesh, ann.text, true);
-					});
-					deletedAnnotations.forEach((rect) => this.removeAnnotation(rect.linkedMesh as AbstractMesh, true));
-				});
+			axios.post<RawAnnotation[]>(`${BACKEND_URL}/annotations`, { id: this.modelId, annotation: { mesh: mesh.name, text: annotation } });
 		}
 	}
 
@@ -657,25 +629,7 @@ export default class EpiDataModule {
 		}
 
 		if (!doNotNotify) {
-			axios.delete<RawAnnotation[]>(`${BACKEND_URL}/annotations`, { data: { id: this.modelId, name: mesh.name } }).then((res) => {
-				const serverAnnotations = res.data;
-
-				const newAnnotations = serverAnnotations.filter((ann) => {
-					const mesh = this.scene.getMeshByName(ann.mesh);
-
-					return mesh && !this.hasAnnotation(mesh);
-				});
-				const deletedAnnotations = [
-					...[...this.arcAnnotations.values()].filter((rect) => !serverAnnotations.find((ann) => ann.mesh === rect.linkedMesh.name)),
-					...[...this.flagAnnotations.values()].filter((rect) => !serverAnnotations.find((ann) => ann.mesh === rect.linkedMesh.name))
-				];
-
-				newAnnotations.forEach((ann) => {
-					const mesh = this.scene.getMeshByName(ann.mesh);
-					this.addAnnotation(mesh, ann.text, true);
-				});
-				deletedAnnotations.forEach((rect) => this.removeAnnotation(rect.linkedMesh as AbstractMesh, true));
-			});
+			axios.delete<RawAnnotation[]>(`${BACKEND_URL}/annotations`, { data: { id: this.modelId, name: mesh.name } });
 		}
 	}
 

@@ -4,7 +4,6 @@
 	import Button from '../Button.svelte';
 	import Slider from '../Slider.svelte';
 
-
 	export let closed: boolean = true;
 	export let game: GameLite;
 	export let canvas: HTMLCanvasElement;
@@ -18,9 +17,7 @@
 		showGuide: boolean = false,
 		x: number = 0,
 		y: number = 0,
-		z: number = 0,
-		eagerX: number = 0,
-		eagerY: number = 0;
+		z: number = 0;
 
 	events.on('RECALL_SORT', (sort: Sort) => {
 		if (sort.radSelect) {
@@ -34,8 +31,6 @@
 				x = sort.radSelect.position.x;
 				y = sort.radSelect.position.y;
 				z = sort.radSelect.position.z;
-				eagerX = x;
-				eagerY = y;
 			});
 			canvas.dispatchEvent(new Event('dblclick'));
 		}
@@ -83,8 +78,6 @@
 		x = 0;
 		y = 0;
 		z = 0;
-		eagerX = x;
-		eagerY = y;
 	}
 
 	function start(): void {
@@ -94,12 +87,10 @@
 				.then(() => {
 					initPos = false;
 					settingParams = true;
-					Math.ceil((radius = game.radSelect.radius));
+					radius = Math.ceil(game.radSelect.radius);
 					x = Math.round(game.radSelect.position.x);
 					y = Math.round(game.radSelect.position.y);
 					z = Math.round(game.radSelect.position.z);
-					eagerX = x;
-					eagerY = y;
 				})
 				.catch(() => {
 					initPos = false;

@@ -24,6 +24,21 @@ type ListenerMap<T extends Record<string, any>> = {
 	[event in keyof T]: EvtListener<T[event]>[];
 };
 
+type InboundMsgTypes = 'HIST_ADD' | 'HIST_DEL' | 'HIST_EDIT' | 'ANN_ADD' | 'ANN_DEL';
+type OutboundMsgTypes = 'LINK';
+
+type SocketReceiveMsgs = {
+	HIST_ADD: { type: 'HIST_ADD'; newSort: Sort };
+	HIST_DEL: { type: 'HIST_DEL'; id: string };
+	HIST_EDIT: { type: 'HIST_EDIT'; id: string; name: string };
+	ANN_ADD: { type: 'ANN_ADD'; newAnnotation: RawAnnotation };
+	ANN_DEL: { type: 'ANN_DEL'; mesh: string };
+};
+
+type SocketSendMsgs = {
+	LINK: { type: 'LINK'; id: string; roomId: string };
+};
+
 interface RawVector3 {
 	x: number;
 	y: number;
@@ -217,4 +232,8 @@ interface RenderedArc {
 	cubes: Mesh[];
 	tris: Mesh[];
 	enabled: boolean;
+}
+
+interface SocketMsg<T extends string> {
+	type: T;
 }

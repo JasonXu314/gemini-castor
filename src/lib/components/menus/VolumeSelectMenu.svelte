@@ -34,7 +34,7 @@
 	$: if (game && maxZ > minZ && maxZ <= game.structure.maxZ) {
 		game.volSelect.updateBound('maxZ', Number(maxZ));
 	}
-	$: if (game) {
+	$: if (game && minZ < maxZ && minZ >= game.structure.minZ) {
 		game.volSelect.updateBound('minZ', minZ);
 	}
 
