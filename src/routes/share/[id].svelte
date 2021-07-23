@@ -2,6 +2,7 @@
 	import { page } from '$app/stores';
 	import Button from '$lib/components/Button.svelte';
 	import Console from '$lib/components/console/Console.svelte';
+	import FancyInput from '$lib/components/FancyInput.svelte';
 	import GameLite from '$lib/game';
 	import { BACKEND_URL } from '$lib/utils/constants';
 	import { decodeEpiData, decodeRefGenes, decodeStruct } from '$lib/utils/serializations';
@@ -21,6 +22,10 @@
 		socketId: string,
 		socket: MySocket<SocketReceiveMsgs, SocketSendMsgs>,
 		liveSession: LiveSessionData | null = null,
+		askLive: boolean = false,
+		liveName: string,
+		rejectLive: () => void,
+		resolveLive: (name: string) => void,
 		id: string;
 
 	$: historyStore.set(sortHist);
@@ -159,6 +164,30 @@
 
 					if (res.data.live) {
 						liveSession = res.data.session;
+
+						getLiveName()
+							.then((name) => {
+								mainSock.send({
+									type: 'JOIN_LIVE',
+									name
+								});
+								new Promise<void>((resolve) => {
+									mainSock.on('JOIN_LIVE', ({ id }) => {
+										if (id === socketId) {
+											resolve();
+										}
+									});
+								}).then(() => {
+									askLive = false;
+								});
+								resolveLive = null;
+								rejectLive = null;
+							})
+							.catch(() => {
+								askLive = false;
+								resolveLive = null;
+								rejectLive = null;
+							});
 					}
 				});
 			});
@@ -166,6 +195,14 @@
 		} else if (!id) {
 			console.log(`Model id undefined: ${id}`);
 		}
+	}
+
+	async function getLiveName(): Promise<string> {
+		askLive = true;
+		return new Promise((resolve, reject) => {
+			resolveLive = resolve;
+			rejectLive = reject;
+		});
 	}
 </script>
 
@@ -217,6 +254,42 @@
 			}}
 		/>
 	{/if}
+	{#if askLive}
+		<div class="live-menu">
+			<h4 class="alert">
+				{liveSession.participants.find(({ id }) => id === liveSession.hostID).name} is hosting a live session on this model, would you like to join?
+			</h4>
+			<FancyInput bind:value={liveName} label="Name" id="live-name" />
+			<div class="button-row">
+				<Button
+					type="action"
+					on:click={() => {
+						if (liveName.trim().length > 0 && resolveLive) {
+							resolveLive(liveName);
+						}
+					}}>Join</Button
+				>
+				<Button
+					type="cancel"
+					on:click={() => {
+						if (rejectLive) {
+							rejectLive();
+						}
+					}}>Cancel</Button
+				>
+			</div>
+		</div>
+	{/if}
+	{#if askLive}
+		<div
+			class="blur"
+			on:click={() => {
+				if (rejectLive) {
+					rejectLive();
+				}
+			}}
+		/>
+	{/if}
 </div>
 
 <style>
@@ -247,5 +320,24 @@
 		left: 50%;
 		transform: translate(-50%, -50%);
 		z-index: 2;
+	}
+
+	.live-menu {
+		position: absolute;
+		background: white;
+		padding: 0.5em 1em;
+		border-radius: 4px;
+		top: 50%;
+		left: 50%;
+		transform: translate(-50%, -50%);
+		z-index: 2;
+	}
+
+	.live-menu .alert {
+		margin-bottom: 0.25em;
+	}
+
+	.live-menu .button-row {
+		margin-top: 0.5em;
 	}
 </style>

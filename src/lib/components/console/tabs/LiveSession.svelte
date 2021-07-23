@@ -92,43 +92,67 @@
 			});
 		}
 	});
+
+	socket.on('LEAVE_LIVE', ({ id }) => {
+		participants = participants.filter(({ id: pId }) => pId !== id);
+		if (id === socketId) {
+			inSession = false;
+		}
+	});
 </script>
 
 <div class="console" class:hidden={closed}>
-	<Button
-		type={hasLive && inSession ? 'cancel' : 'action'}
-		on:click={() => {
-			if (!hasLive) {
-				if (name.trim().length > 0) {
-					const { x, y, z } = game.camera.position;
-					const { x: rx, y: ry, z: rz } = game.camera.rotation;
-
-					socket.send({
-						type: 'START_LIVE',
-						camPos: { x, y, z },
-						camRot: { x: rx, y: ry, z: rz },
-						name
-					});
-				}
-			} else {
-				if (inSession) {
-					if (hostId === socketId) {
-						socket.send({ type: 'END_LIVE' });
-					} else {
-						socket.send({ type: 'LEAVE_LIVE' });
-					}
-				} else {
+	<div class="controls">
+		<Button
+			type={hasLive && inSession ? 'cancel' : 'action'}
+			on:click={() => {
+				if (!hasLive) {
 					if (name.trim().length > 0) {
+						const { x, y, z } = game.camera.position;
+						const { x: rx, y: ry, z: rz } = game.camera.rotation;
+
 						socket.send({
-							type: 'JOIN_LIVE',
+							type: 'START_LIVE',
+							camPos: { x, y, z },
+							camRot: { x: rx, y: ry, z: rz },
 							name
 						});
 					}
+				} else {
+					if (inSession) {
+						if (hostId === socketId) {
+							socket.send({ type: 'END_LIVE' });
+						} else {
+							socket.send({ type: 'LEAVE_LIVE' });
+						}
+					} else {
+						if (name.trim().length > 0) {
+							socket.send({
+								type: 'JOIN_LIVE',
+								name
+							});
+						}
+					}
 				}
-			}
-		}}>{hasLive ? (inSession ? (hostId === socketId ? 'End Live Session' : 'Leave Live Session') : 'Join Live Session') : 'Create Live Session'}</Button
-	>
-	<FancyInput dark disabled={inSession} id="name" label="Name" bind:value={name} />
+			}}
+			>{hasLive
+				? inSession
+					? hostId === socketId
+						? 'End Live Session'
+						: 'Leave Live Session'
+					: 'Join Live Session'
+				: 'Create Live Session'}</Button
+		>
+		<FancyInput dark disabled={inSession} id="name" label="Name" bind:value={name} />
+	</div>
+	<div class="participants">
+		{#each participants as participant}
+			<div class="participant">
+				<h4 class="name">{participant.name}</h4>
+				<small class="id">{participant.id}</small>
+			</div>
+		{/each}
+	</div>
 </div>
 
 <style>
@@ -136,9 +160,36 @@
 		color: white;
 		background: rgba(0, 0, 0, 0);
 		padding: 0.5em 1em;
+		display: flex;
+		flex-direction: row;
 	}
 
 	.console.hidden {
 		display: none;
+	}
+
+	.participants {
+		display: flex;
+		flex-direction: column;
+		margin-left: 2em;
+		overflow-x: hidden;
+		overflow-y: scroll;
+		max-height: 200px;
+		padding-bottom: 1px;
+	}
+
+	.participants::-webkit-scrollbar {
+		width: 0;
+	}
+
+	.participants .participant {
+		border: 1px solid white;
+		color: white;
+		padding: 0.25em 0.5em;
+		margin-bottom: -1px;
+	}
+
+	.participants .participant .id {
+		font-size: xx-small;
 	}
 </style>
