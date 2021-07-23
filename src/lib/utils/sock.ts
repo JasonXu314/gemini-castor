@@ -22,7 +22,7 @@ export default class MySocket<
 		});
 
 		this._socket.addEventListener('message', (evt) => {
-			let msg = JSON.parse(evt.data) as SocketMsg<InboundMsgTypes>;
+			let msg = JSON.parse(evt.data);
 			// @ts-ignore no clue why ts fucks up here, but it should work nonetheless
 			this.events.dispatch(msg.type, msg);
 		});

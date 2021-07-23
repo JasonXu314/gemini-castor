@@ -3,7 +3,9 @@
 	import FancyInput from '$lib/components/FancyInput.svelte';
 	import type GameLite from '$lib/game';
 	import type MySocket from '$lib/utils/sock';
-	import { Vector3 } from 'babylonjs';
+	import pkg from 'babylonjs';
+
+	const { Vector3 } = pkg;
 
 	export let game: GameLite;
 	export let socket: MySocket<SocketReceiveMsgs, SocketSendMsgs>;
