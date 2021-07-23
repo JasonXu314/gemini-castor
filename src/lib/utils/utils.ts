@@ -1,3 +1,4 @@
+import type { Vector3 } from 'babylonjs';
 import type BasePairSelectorModule from '../bps';
 import type RadiusSelectorModule from '../radiusSelector';
 import type VolumeSelectorModule from '../volumeSelector';
@@ -121,6 +122,14 @@ export function compareSorts(a: Sort, b: Sort): boolean {
 		return false;
 	}
 	return true;
+}
+
+export function strictCompareVectors(v1: Vector3, v2: Vector3): boolean {
+	return (!v1 && !v2) || (v1 && v2 && v1.x === v2.x && v1.y === v2.y && v1.z === v2.z);
+}
+
+export function compareVectors(v1: Vector3, v2: Vector3): boolean {
+	return (!v1 && !v2) || (v1 && v2 && Math.abs(v1.x - v2.x) < 1 && Math.abs(v1.y - v2.y) < 1 && Math.abs(v1.z - v2.z) < 1);
 }
 
 /**

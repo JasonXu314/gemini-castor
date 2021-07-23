@@ -218,6 +218,11 @@ export default class BasePairSelectorModule {
 		}
 	}
 
+	public recallSort(params: BPSParams): void {
+		this.regions = params.regions;
+		this.radius = params.radius;
+	}
+
 	/**
 	 * Resets the sort (WARNING: do not use ``override = true`` UNLESS you can guarantee that the appropriate resets will be made elsewhere in the model
 	 * (struct, epiData, etc.))

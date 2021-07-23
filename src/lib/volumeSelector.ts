@@ -245,6 +245,16 @@ export default class VolumeSelectorModule {
 		}
 	}
 
+	public recallSort(params: VolSelectParams): void {
+		this.start();
+		this.updateBound('minX', params.minX);
+		this.updateBound('maxX', params.maxX);
+		this.updateBound('minY', params.minY);
+		this.updateBound('maxY', params.maxY);
+		this.updateBound('minZ', params.minZ);
+		this.updateBound('maxZ', params.maxZ);
+	}
+
 	/**
 	 * Resets the sort ``(WARNING: do not use override = true UNLESS you can guarantee that the appropriate
 	 * resets will be made elsewhere in the model (struct, epiData, etc.))``

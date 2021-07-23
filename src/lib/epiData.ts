@@ -13,6 +13,8 @@ import { EventSrc, Logger } from './utils/utils';
 interface EpiDataEvents {
 	ARC_SHOW: undefined;
 	FLAG_SHOW: undefined;
+	CREATED_ANNOTATION: AbstractMesh;
+	DELETED_ANNOTATION: AbstractMesh;
 }
 
 /** Class to handle all operations regarding epiData data and rendering */
@@ -24,9 +26,6 @@ export default class EpiDataModule {
 	private gui: AdvancedDynamicTexture;
 	private unloadedAnnotations: RawAnnotation[];
 	public annotationsShown: boolean;
-
-	// IDs for names
-	private currArcID: number;
 
 	// Flag Data
 	private flagMeshes: Record<number, Map<RawFlagTrackData, Mesh>> | null;
@@ -80,7 +79,6 @@ export default class EpiDataModule {
 		this.currentRenderedArcData = null;
 		this.annotatedArcs = [];
 		this.arcAnnotations = new Map();
-		this.currArcID = 0;
 
 		this.events = new EventSrc(['ARC_SHOW', 'FLAG_SHOW']);
 
@@ -602,6 +600,8 @@ export default class EpiDataModule {
 		// @ts-ignore this is bad, but it makes the code a lot cleaner
 		(isArc ? this.annotatedArcs : this.annotatedFlags).push(bushEntry);
 
+		this.events.dispatch('CREATED_ANNOTATION', mesh);
+
 		if (!doNotNotify) {
 			axios.post<RawAnnotation[]>(`${BACKEND_URL}/annotations`, { id: this.modelId, annotation: { mesh: mesh.name, text: annotation } });
 		}
@@ -628,9 +628,23 @@ export default class EpiDataModule {
 			this.annotatedFlags = this.annotatedFlags.filter((data) => data !== bushEntry);
 		}
 
+		this.events.dispatch('DELETED_ANNOTATION', mesh);
+
 		if (!doNotNotify) {
 			axios.delete<RawAnnotation[]>(`${BACKEND_URL}/annotations`, { data: { id: this.modelId, name: mesh.name } });
 		}
+	}
+
+	public getInfo(mesh: AbstractMesh): EpiDataFeature {
+		const isArc = mesh.name.startsWith('arc');
+		const bushEntry = this.getBushEntry(mesh);
+
+		return {
+			type: isArc ? 'arc' : 'flag',
+			data: bushEntry.raw,
+			track: bushEntry.raw.id,
+			mesh
+		} as EpiDataFeature;
 	}
 
 	/** Clears the arcs */

@@ -18,7 +18,7 @@ import BasePairSelectorModule from './bps';
 import EpiDataModule from './epiData';
 import RadiusSelectorModule from './radiusSelector';
 import StructureModule from './structure';
-import { EventSrc, findShortest, Logger, serializeParams2, serializeParams3 } from './utils/utils';
+import { compareVectors, EventSrc, findShortest, Logger, serializeParams2, serializeParams3, strictCompareVectors } from './utils/utils';
 import VolumeSelectorModule from './volumeSelector';
 // const {
 // 	Color3,
@@ -41,6 +41,10 @@ interface GameLiteEvents {
 	START_SET_ANN_NAME: string;
 	CANCEL_SET_ANN_NAME: undefined;
 	SET_ANN_NAME: string;
+	SELECT_FEATURE: EpiDataFeature;
+	DESELECT_FEATURE: undefined;
+	RECALL_SORT: Sort;
+	CAM_CHANGE: undefined;
 }
 
 const optimizerOptions = new SceneOptimizerOptions();
@@ -60,6 +64,10 @@ export default class GameLite {
 	// Caches
 	private structCache: Record<string, RawStructureCoord[]>;
 	private epiDataCache: Record<string, RawEpiData>;
+
+	// To track camera movement
+	private prevCamPos: Vector3;
+	private prevCamRot: Vector3;
 
 	public scene: Scene;
 	public camera: UniversalCamera;
@@ -83,12 +91,16 @@ export default class GameLite {
 	public hoverMesh: AbstractMesh | null;
 	public originalColor: Color3 | null;
 
+	// Selected mesh
+	public selectedMesh: AbstractMesh | null;
+	public selectedOriginalColor: Color3 | null;
+
 	/**
 	 * Makes a new instance of the game
 	 * @param canvas the canvas to render on
 	 * @param rawData raw data for loading saved model
 	 */
-	constructor(private canvas: HTMLCanvasElement, public rawData: RawGameMetadata, initSortId: number, annotations: RawAnnotation[]) {
+	constructor(public canvas: HTMLCanvasElement, public rawData: RawGameMetadata, initSortId: number, annotations: RawAnnotation[]) {
 		// Initialize utility stuff
 		this.logger = new Logger('Main');
 		this.engine = new Engine(canvas.getContext('webgl'));
@@ -102,7 +114,17 @@ export default class GameLite {
 		this.epiDataCache = {};
 
 		// Initialize events
-		this.events = new EventSrc(['RESET', 'ACTIVE', 'START_SET_ANN_NAME', 'CANCEL_SET_ANN_NAME', 'SET_ANN_NAME']);
+		this.events = new EventSrc([
+			'RESET',
+			'ACTIVE',
+			'START_SET_ANN_NAME',
+			'CANCEL_SET_ANN_NAME',
+			'SET_ANN_NAME',
+			'SELECT_FEATURE',
+			'DESELECT_FEATURE',
+			'RECALL_SORT',
+			'CAM_CHANGE'
+		]);
 
 		// Set up scene optimizers
 		this.optimizer = new SceneOptimizer(this.scene, optimizerOptions);
@@ -189,31 +211,72 @@ export default class GameLite {
 
 		// Add listeners for click detection
 		this.scene.onPointerDown = (evt) => {
-			if (this.hoverMesh && !this.radSelect.initPos && (evt.button === 0 || evt.button === 2)) {
-				const downMesh = this.hoverMesh;
+			if (!this.radSelect.initPos && (evt.button === 0 || evt.button === 2)) {
+				if (this.hoverMesh) {
+					const downMesh = this.hoverMesh;
 
-				this.scene.onPointerMove = () => {
-					if (!this.hoverMesh) {
+					this.scene.onPointerMove = () => {
+						if (!this.hoverMesh) {
+							this.scene.onPointerUp = undefined;
+							this.scene.onPointerMove = undefined;
+						}
+					};
+					this.scene.onPointerUp = (evt) => {
+						if (evt.button === 0 && this.hoverMesh && this.hoverMesh === downMesh) {
+							if (this.selectedMesh) {
+								this.events.dispatch('DESELECT_FEATURE');
+								(this.selectedMesh.material as StandardMaterial).diffuseColor = this.selectedOriginalColor;
+								this.selectedMesh = null;
+								this.selectedOriginalColor = null;
+							}
+
+							this.selectedMesh = downMesh;
+							this.selectedOriginalColor = this.originalColor;
+
+							// @ts-ignore no clue why ts fucks up here, but it should work nonetheless
+							this.events.dispatch('SELECT_FEATURE', this.epiData.getInfo(this.selectedMesh));
+						}
+						if (evt.button === 2 && this.hoverMesh === downMesh) {
+							this.events.dispatch('DESELECT_FEATURE');
+							(this.selectedMesh.material as StandardMaterial).diffuseColor = this.selectedOriginalColor;
+							this.selectedMesh = null;
+							this.selectedOriginalColor = null;
+						}
 						this.scene.onPointerUp = undefined;
 						this.scene.onPointerMove = undefined;
-					}
-				};
-				this.scene.onPointerUp = (evt) => {
-					if (evt.button === 0 && this.hoverMesh && this.hoverMesh === downMesh && !this.epiData.hasAnnotation(downMesh)) {
-						this.getAnnotationName(downMesh.name)
-							.then((annotation) => {
-								this.epiData.addAnnotation(downMesh, annotation);
-							})
-							.catch(() => {});
-					}
-					if (evt.button === 2 && this.hoverMesh && this.hoverMesh === downMesh && this.epiData.hasAnnotation(downMesh)) {
-						this.epiData.removeAnnotation(this.hoverMesh);
-					}
-					this.scene.onPointerUp = undefined;
-					this.scene.onPointerMove = undefined;
-				};
+					};
+				} else if (evt.button === 2) {
+					this.scene.onPointerMove = () => {
+						if (this.hoverMesh) {
+							this.scene.onPointerUp = undefined;
+							this.scene.onPointerMove = undefined;
+						}
+					};
+					this.scene.onPointerUp = (evt) => {
+						if (evt.button === 2 && !this.hoverMesh) {
+							this.events.dispatch('DESELECT_FEATURE');
+							(this.selectedMesh.material as StandardMaterial).diffuseColor = this.selectedOriginalColor;
+							this.selectedMesh = null;
+							this.selectedOriginalColor = null;
+						}
+						this.scene.onPointerUp = undefined;
+						this.scene.onPointerMove = undefined;
+					};
+				}
 			}
 		};
+
+		this.events.on('RECALL_SORT', (sort: Sort) => {
+			if (sort.radSelect) {
+				this.radSelect.recallSort(sort.radSelect);
+			}
+			if (sort.volSelect) {
+				this.volSelect.recallSort(sort.volSelect);
+			}
+			if (sort.bpsSelect) {
+				this.bpsSelect.recallSort(sort.bpsSelect);
+			}
+		});
 
 		// For debugging purposes (probably should be commented for production)
 		(window as any).game = this;
@@ -435,30 +498,42 @@ export default class GameLite {
 					this.radSelect.updateGuide();
 				}
 
+				if (!compareVectors(this.camera.position, this.prevCamPos) || !strictCompareVectors(this.camera.rotation, this.prevCamRot)) {
+					this.events.dispatch('CAM_CHANGE');
+					this.prevCamPos = this.camera.position.clone();
+					this.prevCamRot = this.camera.rotation.clone();
+				}
+
 				const hit = this.scene.pick(this.scene.pointerX, this.scene.pointerY);
 				if (hit.hit) {
 					if (this.hoverMesh && this.hoverMesh !== hit.pickedMesh) {
-						(this.hoverMesh.material as StandardMaterial).diffuseColor = this.originalColor;
+						if (this.hoverMesh !== this.selectedMesh) {
+							(this.hoverMesh.material as StandardMaterial).diffuseColor = this.originalColor;
+							this.originalColor = null;
+						}
 						this.hoverMesh = null;
-						this.originalColor = null;
 					}
 
 					if (!this.hoverMesh) {
-						this.originalColor = (hit.pickedMesh.material as StandardMaterial).diffuseColor;
-						const { r, g, b } = this.originalColor;
-						const rgbTotal = r * 0.75 + g * 2 + b * 0.75;
-						(hit.pickedMesh.material as StandardMaterial).diffuseColor = new Color3(
-							rgbTotal < 1.75 ? r * 2 : r / 2,
-							rgbTotal < 1.75 ? g * 2 : g / 2,
-							rgbTotal < 1.75 ? b * 2 : b / 2
-						);
+						if (hit.pickedMesh !== this.selectedMesh) {
+							this.originalColor = (hit.pickedMesh.material as StandardMaterial).diffuseColor;
+							const { r, g, b } = this.originalColor;
+							const rgbTotal = r * 0.75 + g * 2 + b * 0.75;
+							(hit.pickedMesh.material as StandardMaterial).diffuseColor = new Color3(
+								rgbTotal < 1.75 ? r * 2 : r / 2,
+								rgbTotal < 1.75 ? g * 2 : g / 2,
+								rgbTotal < 1.75 ? b * 2 : b / 2
+							);
+						}
 						this.hoverMesh = hit.pickedMesh;
 						this.canvas.classList.add('cp');
 					}
 				} else if (this.hoverMesh) {
-					(this.hoverMesh.material as StandardMaterial).diffuseColor = this.originalColor.clone();
+					if (this.selectedMesh !== this.hoverMesh) {
+						(this.hoverMesh.material as StandardMaterial).diffuseColor = this.originalColor.clone();
+						this.originalColor = null;
+					}
 					this.hoverMesh = null;
-					this.originalColor = null;
 					this.canvas.classList.remove('cp');
 				}
 			});
@@ -498,7 +573,7 @@ export default class GameLite {
 		}, 0);
 	}
 
-	private getAnnotationName(defName: string): Promise<string> {
+	public async getAnnotationName(defName: string): Promise<string> {
 		this.events.dispatch('START_SET_ANN_NAME', defName);
 
 		return new Promise((resolve, reject) => {

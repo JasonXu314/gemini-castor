@@ -1,31 +1,40 @@
 <script lang="ts">
 	import { page } from '$app/stores';
 	import Button from '$lib/components/Button.svelte';
-	import BasePairSelectMenu from '$lib/components/menus/BasePairSelectMenu.svelte';
-	import GeneralMenu from '$lib/components/menus/GeneralMenu.svelte';
-	import RadiusSelectMenu from '$lib/components/menus/RadiusSelectMenu.svelte';
-	import VolumeSelectMenu from '$lib/components/menus/VolumeSelectMenu.svelte';
-	import PastSort from '$lib/components/PastSort.svelte';
+	import Console from '$lib/components/console/Console.svelte';
 	import GameLite from '$lib/game';
 	import { BACKEND_URL } from '$lib/utils/constants';
 	import { decodeEpiData, decodeRefGenes, decodeStruct } from '$lib/utils/serializations';
 	import MySocket from '$lib/utils/sock';
-	import { compareSorts, EventSrc } from '$lib/utils/utils';
+	import { historyStore } from '$lib/utils/stores';
+	import { compareSorts } from '$lib/utils/utils';
 	import axios from 'axios';
-	import { onMount } from 'svelte';
+	import { onMount, setContext } from 'svelte';
 
 	let canvas: HTMLCanvasElement,
 		game: GameLite,
 		sortHist: Sort[] = [],
 		sortsActive: boolean = false,
-		sortsClosed: boolean = false,
-		histClosed: boolean = false,
 		fetching: boolean = false,
 		settingAnnotation: boolean = false,
 		annotationName: string = '',
-		socketId: string;
-	const events: EventSrc<MainEvents> = new EventSrc<MainEvents>(['RECALL_SORT']);
-	let id: string;
+		socketId: string,
+		socket: MySocket<SocketReceiveMsgs, SocketSendMsgs>,
+		liveSession: LiveSessionData | null = null,
+		id: string;
+
+	$: historyStore.set(sortHist);
+
+	setContext<HistoryContext>('HISTORY_CONTEXT', {
+		renameSort: (sort: Sort) => {
+			const { _id, name } = sort;
+			axios.patch<Sort[]>(`${BACKEND_URL}/history`, { id, _id, name }).catch(() => alert('Failed to rename sort; name will be lost on refresh'));
+		},
+		deleteSort: (sort: Sort) => {
+			const { _id, name } = sort;
+			axios.delete<Sort[]>(`${BACKEND_URL}/history`, { data: { id, _id, name } }).catch(() => alert('Failed to delete sort'));
+		}
+	});
 
 	page.subscribe((page) => {
 		id = page.params.id;
@@ -108,10 +117,15 @@
 						'ANN_DEL',
 						'HIST_ADD',
 						'HIST_DEL',
-						'HIST_EDIT'
+						'HIST_EDIT',
+						'START_LIVE',
+						'JOIN_LIVE',
+						'LEAVE_LIVE',
+						'CAM_CHANGE'
 					]);
 
 					mainSock.send({ type: 'LINK', id: res.data.socketId, roomId: id });
+					socketId = res.data.socketId;
 
 					mainSock.on('HIST_ADD', ({ newSort }) => {
 						if (!sortHist.some((existingSort) => compareSorts(existingSort, newSort))) {
@@ -140,28 +154,18 @@
 					mainSock.on('ANN_DEL', ({ mesh }) => {
 						game.epiData.removeRawAnnotation(mesh);
 					});
+
+					socket = mainSock;
+
+					if (res.data.live) {
+						liveSession = res.data.session;
+					}
 				});
 			});
 			fetching = true;
 		} else if (!id) {
 			console.log(`Model id undefined: ${id}`);
 		}
-	}
-
-	function clear() {
-		if (game && game.sortsActive) {
-			game.reset();
-		}
-	}
-
-	function renameSort(sort: Sort) {
-		const { _id, name } = sort;
-		axios.patch<Sort[]>(`${BACKEND_URL}/history`, { id, _id, name }).catch(() => alert('Failed to rename sort; name will be lost on refresh'));
-	}
-
-	function delSort(sort: Sort) {
-		const { _id, name } = sort;
-		axios.delete<Sort[]>(`${BACKEND_URL}/history`, { data: { id, _id, name } }).catch(() => alert('Failed to delete sort'));
 	}
 </script>
 
@@ -177,68 +181,9 @@
 		width={typeof window === 'undefined' ? 800 : window.innerWidth}
 		height={typeof window === 'undefined' ? 600 : window.innerHeight}
 	/>
-	<div class="action-menu" class:sortclosed={sortsClosed}>
-		{#if sortsClosed}
-			<img
-				class="arrow"
-				src="/images/triangle-top-arrow.svg"
-				alt=""
-				on:click={() => {
-					sortsClosed = !sortsClosed;
-				}}
-			/>
-		{:else}
-			<img
-				class="arrow"
-				src="/images/triangle-right-arrow.svg"
-				alt=""
-				on:click={() => {
-					sortsClosed = !sortsClosed;
-				}}
-			/>
-		{/if}
-		<Button type="cancel" on:click={clear}>Clear Sorts</Button>
-		<GeneralMenu {game} />
-		<BasePairSelectMenu {events} {game} />
-		<RadiusSelectMenu {events} {game} {canvas} />
-		<VolumeSelectMenu {events} {game} />
-	</div>
-	<div class="past-sorts" class:histclosed={histClosed}>
-		{#if histClosed}
-			<img
-				class="arrow"
-				src="/images/triangle-top-arrow.svg"
-				alt=""
-				on:click={() => {
-					histClosed = !histClosed;
-				}}
-			/>
-		{:else}
-			<img
-				class="arrow"
-				src="/images/triangle-right-arrow.svg"
-				alt=""
-				on:click={() => {
-					histClosed = !histClosed;
-				}}
-			/>
-		{/if}
-		{#each sortHist as sort}
-			<PastSort
-				{sort}
-				disabled={sortsActive}
-				on:blur={() => {
-					renameSort(sort);
-				}}
-				recall={() => {
-					events.dispatch('RECALL_SORT', sort);
-				}}
-				del={() => {
-					delSort(sort);
-				}}
-			/>
-		{/each}
-	</div>
+	{#if game}
+		<Console {game} {socket} {socketId} {liveSession} />
+	{/if}
 
 	{#if settingAnnotation}
 		<div class="annotation-menu">
@@ -275,44 +220,6 @@
 </div>
 
 <style>
-	.action-menu {
-		position: absolute;
-		bottom: 0px;
-		background: white;
-		padding: 1em;
-		min-width: max-content;
-		box-sizing: content-box;
-	}
-
-	.main .past-sorts {
-		position: absolute;
-		bottom: 0px;
-		background: white;
-		right: 0px;
-		padding: 1em;
-		min-width: max-content;
-		box-sizing: content-box;
-	}
-
-	.sortclosed {
-		height: 1em;
-		width: 1em;
-		overflow: hidden;
-	}
-
-	.histclosed {
-		height: 0.6em;
-		width: 1em;
-		overflow: hidden;
-	}
-
-	.arrow {
-		height: 1em;
-		width: 1em;
-		margin-right: 0.25em;
-		cursor: pointer;
-	}
-
 	.canvas {
 		display: block;
 	}

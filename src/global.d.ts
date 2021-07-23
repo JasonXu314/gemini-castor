@@ -24,8 +24,7 @@ type ListenerMap<T extends Record<string, any>> = {
 	[event in keyof T]: EvtListener<T[event]>[];
 };
 
-type InboundMsgTypes = 'HIST_ADD' | 'HIST_DEL' | 'HIST_EDIT' | 'ANN_ADD' | 'ANN_DEL';
-type OutboundMsgTypes = 'LINK';
+type EpiDataFeature = SelectedFlag | SelectedArc;
 
 type SocketReceiveMsgs = {
 	HIST_ADD: { type: 'HIST_ADD'; newSort: Sort };
@@ -33,10 +32,20 @@ type SocketReceiveMsgs = {
 	HIST_EDIT: { type: 'HIST_EDIT'; id: string; name: string };
 	ANN_ADD: { type: 'ANN_ADD'; newAnnotation: RawAnnotation };
 	ANN_DEL: { type: 'ANN_DEL'; mesh: string };
+	START_LIVE: { type: 'START_LIVE'; data: LiveSessionData };
+	JOIN_LIVE: { type: 'JOIN_LIVE'; id: string; name: string };
+	LEAVE_LIVE: { type: 'LEAVE_LIVE'; id: string };
+	CAM_CHANGE: { type: 'CAM_CHANGE'; camPos: RawVector3; camRot: RawVector3 };
+	END_LIVE: { type: 'END_LIVE' };
 };
 
 type SocketSendMsgs = {
 	LINK: { type: 'LINK'; id: string; roomId: string };
+	START_LIVE: { type: 'START_LIVE'; camPos: RawVector3; camRot: RawVector3; name: string };
+	JOIN_LIVE: { type: 'JOIN_LIVE'; name: string };
+	LEAVE_LIVE: { type: 'LEAVE_LIVE' };
+	END_LIVE: { type: 'END_LIVE' };
+	CAM_CHANGE: { type: 'CAM_CHANGE'; camPos: RawVector3; camRot: RawVector3 };
 };
 
 interface RawVector3 {
@@ -69,6 +78,8 @@ interface Model {
 	modelData: ModelData;
 	sortHist: Sort[];
 	annotations: RawAnnotation[];
+	live: boolean;
+	session: null | LiveSessionData;
 }
 
 interface RadSelectParams {
@@ -96,10 +107,6 @@ interface Sort {
 	radSelect: RadSelectParams | null;
 	volSelect: VolSelectParams | null;
 	bpsSelect: BPSParams | null;
-}
-
-interface MainEvents {
-	RECALL_SORT: Sort;
 }
 
 interface RawStructureCoord extends RawVector3 {
@@ -236,4 +243,35 @@ interface RenderedArc {
 
 interface SocketMsg<T extends string> {
 	type: T;
+}
+
+interface SelectedFlag {
+	type: 'flag';
+	data: RawFlagTrackData;
+	track: number;
+	mesh: AbstractMesh;
+}
+
+interface SelectedArc {
+	type: 'arc';
+	data: RawArcTrackData;
+	track: number;
+	mesh: AbstractMesh;
+}
+
+interface HistoryContext {
+	renameSort: (sort: Sort) => void;
+	deleteSort: (sort: Sort) => void;
+}
+
+interface LiveParticipant {
+	id: string;
+	name: string;
+}
+
+interface LiveSessionData {
+	hostID: string;
+	camPos: RawVector3;
+	camRot: RawVector3;
+	participants: LiveParticipant[];
 }

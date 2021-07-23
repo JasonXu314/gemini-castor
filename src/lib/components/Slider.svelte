@@ -6,6 +6,7 @@
 	export let disabled: boolean;
 	export let softMin: number = min;
 	export let softMax: number = max;
+	export let dark: boolean = false;
 
 	let eagerValue: string = String(value);
 
@@ -45,6 +46,7 @@
 	/>
 	<input
 		class="subtle-input"
+		class:dark
 		type="text"
 		on:blur={() => {
 			if (!disabled) {
@@ -70,5 +72,11 @@
 	.main .subtle-input {
 		border: 0;
 		border-bottom: 1px solid #666666;
+		background: rgba(0, 0, 0, 0);
+	}
+
+	.main .subtle-input.dark {
+		color: white;
+		border-bottom: 1px solid #cccccc;
 	}
 </style>

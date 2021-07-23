@@ -28,13 +28,19 @@
 		<p>Region: {sort.bpsSelect.regions}</p>
 		<p>Radius: {sort.bpsSelect.radius}</p>
 	{/if}
-	<Button type="action" {disabled} on:click={recall}>Recall Sort</Button>
-	<Button type="cancel" {disabled} on:click={del}>Delete Sort</Button>
+	<Button smol type="action" {disabled} on:click={recall}>Recall Sort</Button>
+	<Button smol type="cancel" {disabled} on:click={del}>Delete Sort</Button>
 </div>
 
 <style>
+	.main {
+		margin: 0.25em 1em;
+	}
+
 	.main .subtle-input {
 		border: 0;
-		border-bottom: 1px solid #666666;
+		border-bottom: 1px solid #cccccc;
+		background: rgba(0, 0, 0, 0);
+		color: white;
 	}
 </style>

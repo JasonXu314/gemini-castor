@@ -341,6 +341,14 @@ export default class RadiusSelectorModule {
 		}
 	}
 
+	public recallSort(params: RadSelectParams): void {
+		this.start().then(() => {
+			this.updateRadius(params.radius);
+			this.updatePosition(params.position);
+		});
+		this.canvas.dispatchEvent(new Event('dblclick'));
+	}
+
 	/** Update the position the guide mesh; called by the main game class */
 	public updateGuide(): void {
 		if (this.game.hoverMesh) {
