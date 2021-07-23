@@ -1,14 +1,20 @@
+import {
+	AbstractMesh,
+	AdvancedDynamicTexture,
+	Color3,
+	Mesh,
+	MeshBuilder,
+	Rectangle,
+	StandardMaterial,
+	TextBlock,
+	Vector3,
+	VertexData
+} from '$lib/utils/babylon';
 import axios from 'axios';
-// import { AbstractMesh, Color3, Mesh, MeshBuilder, StandardMaterial, Vector3, VertexData } from 'babylonjs';
-import pkg from 'babylonjs';
-import gui from 'babylonjs-gui';
-// import { AdvancedDynamicTexture, Rectangle, TextBlock } from 'babylonjs-gui';
 import type StructureModule from './structure';
 import { BACKEND_URL } from './utils/constants';
 import OurBush3D from './utils/ourBush';
 import { EventSrc, Logger } from './utils/utils';
-const { AdvancedDynamicTexture, Rectangle, TextBlock } = gui;
-const { AbstractMesh, Color3, Curve3, Mesh, MeshBuilder, StandardMaterial, Vector3, VertexData } = pkg;
 
 interface EpiDataEvents {
 	ARC_SHOW: undefined;

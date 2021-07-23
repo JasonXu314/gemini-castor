@@ -1,9 +1,7 @@
-import pkg from 'babylonjs';
-// import { Color3, MeshBuilder, StandardMaterial, Vector3 } from 'babylonjs';
+import { Color3, MeshBuilder, StandardMaterial, Vector3 } from '$lib/utils/babylon';
 import type EpiDataModule from './epiData';
 import type StructureModule from './structure';
 import { Logger } from './utils/utils';
-const { Color3, MeshBuilder, StandardMaterial, Vector3 } = pkg;
 
 /** Helper type to define what inputs you can pass to updateBound */
 type Bound = 'minX' | 'maxX' | 'minY' | 'maxY' | 'minZ' | 'maxZ';

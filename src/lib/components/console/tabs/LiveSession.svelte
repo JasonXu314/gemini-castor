@@ -2,10 +2,8 @@
 	import Button from '$lib/components/Button.svelte';
 	import FancyInput from '$lib/components/FancyInput.svelte';
 	import type GameLite from '$lib/game';
+	import { Vector3 } from '$lib/utils/babylon';
 	import type MySocket from '$lib/utils/sock';
-	import pkg from 'babylonjs';
-
-	const { Vector3 } = pkg;
 
 	export let game: GameLite;
 	export let socket: MySocket<SocketReceiveMsgs, SocketSendMsgs>;
@@ -89,6 +87,11 @@
 
 				game.camera.position = new Vector3(x, y, z);
 				game.camera.rotation = new Vector3(rx, ry, rz);
+				game.camera.inertia = 0;
+
+				setTimeout(() => {
+					game.camera.inertia = 0.75;
+				}, 0);
 			});
 		}
 	});
@@ -98,6 +101,11 @@
 		if (id === socketId) {
 			inSession = false;
 		}
+	});
+
+	socket.on('END_LIVE', () => {
+		liveSession = null;
+		inSession = false;
 	});
 </script>
 

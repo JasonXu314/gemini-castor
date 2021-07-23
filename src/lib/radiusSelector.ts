@@ -1,10 +1,8 @@
-import pkg from 'babylonjs';
-// import { Color3, MeshBuilder, StandardMaterial, Vector3 } from 'babylonjs';
+import { Color3, MeshBuilder, StandardMaterial, Vector3 } from '$lib/utils/babylon';
 import type EpiDataModule from './epiData';
 import type GameLite from './game';
 import type StructureModule from './structure';
 import { distance, Logger } from './utils/utils';
-const { Color3, MeshBuilder, StandardMaterial, Vector3 } = pkg;
 
 /**
  * Class to handle all operations regarding the radius selector

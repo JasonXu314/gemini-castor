@@ -1,26 +1,4 @@
-import pkg from 'babylonjs';
-// import {
-// 	Color3,
-// 	Color4,
-// 	Engine,
-// 	HemisphericLight,
-// 	MeshBuilder,
-// 	ParticlesOptimization,
-// 	Scene,
-// 	SceneOptimizer,
-// 	SceneOptimizerOptions,
-// 	ShadowsOptimization,
-// 	UniversalCamera,
-// 	Vector3
-// } from 'babylonjs';
-import { v4 as uuid } from 'uuid';
-import BasePairSelectorModule from './bps';
-import EpiDataModule from './epiData';
-import RadiusSelectorModule from './radiusSelector';
-import StructureModule from './structure';
-import { compareVectors, EventSrc, findShortest, Logger, serializeParams2, serializeParams3, strictCompareVectors } from './utils/utils';
-import VolumeSelectorModule from './volumeSelector';
-const {
+import {
 	Color3,
 	Color4,
 	Engine,
@@ -33,7 +11,14 @@ const {
 	ShadowsOptimization,
 	UniversalCamera,
 	Vector3
-} = pkg;
+} from '$lib/utils/babylon';
+import { v4 as uuid } from 'uuid';
+import BasePairSelectorModule from './bps';
+import EpiDataModule from './epiData';
+import RadiusSelectorModule from './radiusSelector';
+import StructureModule from './structure';
+import { compareVectors, EventSrc, findShortest, Logger, serializeParams2, serializeParams3, strictCompareVectors } from './utils/utils';
+import VolumeSelectorModule from './volumeSelector';
 
 interface GameLiteEvents {
 	RESET: Sort;
@@ -145,6 +130,7 @@ export default class GameLite {
 		this.camera.speed = 500;
 		this.camera.angularSensibility = 200;
 		this.camera.attachControl(false);
+		this.camera.inertia = 0.75;
 		this.hoverMesh = null;
 		this.originalColor = null;
 
