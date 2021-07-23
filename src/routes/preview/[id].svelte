@@ -2,10 +2,9 @@
 	import { page } from '$app/stores';
 	import GameLite from '$lib/game';
 	import { BACKEND_URL } from '$lib/utils/constants';
-	import { decodeEpiData,decodeRefGenes,decodeStruct } from '$lib/utils/serializations';
+	import { decodeEpiData, decodeRefGenes, decodeStruct } from '$lib/utils/serializations';
 	import axios from 'axios';
 	import { onMount } from 'svelte';
-
 
 	let id: string, canvas: HTMLCanvasElement;
 
@@ -16,7 +15,7 @@
 	onMount(tryFetch);
 
 	function tryFetch() {
-		axios.get<Model>(`${BACKEND_URL}/models/${id}`).then((res) => {
+		axios.get<Model>(`${BACKEND_URL}/models/${id}?nosocket=true`).then((res) => {
 			Promise.all([
 				axios.get<Blob>(`${BACKEND_URL}/${id}.gref`, { responseType: 'blob' }).then((res) => {
 					return new Promise<RawRefGene[]>((resolve) => {
