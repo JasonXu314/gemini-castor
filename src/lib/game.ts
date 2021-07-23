@@ -222,21 +222,17 @@ export default class GameLite {
 						}
 					};
 					this.scene.onPointerUp = (evt) => {
-						if (evt.button === 0 && this.hoverMesh && this.hoverMesh === downMesh) {
+						if (evt.button === 0 && this.hoverMesh && this.hoverMesh === downMesh && this.selectedMesh !== downMesh) {
 							if (this.selectedMesh) {
-								this.events.dispatch('DESELECT_FEATURE');
 								(this.selectedMesh.material as StandardMaterial).diffuseColor = this.selectedOriginalColor;
-								this.selectedMesh = null;
-								this.selectedOriginalColor = null;
 							}
-
 							this.selectedMesh = downMesh;
 							this.selectedOriginalColor = this.originalColor;
 
 							// @ts-ignore no clue why ts fucks up here, but it should work nonetheless
 							this.events.dispatch('SELECT_FEATURE', this.epiData.getInfo(this.selectedMesh));
 						}
-						if (evt.button === 2 && this.hoverMesh === downMesh) {
+						if (evt.button === 2 && this.hoverMesh === downMesh && this.selectedMesh) {
 							this.events.dispatch('DESELECT_FEATURE');
 							(this.selectedMesh.material as StandardMaterial).diffuseColor = this.selectedOriginalColor;
 							this.selectedMesh = null;
