@@ -218,6 +218,10 @@ export default class BasePairSelectorModule {
 		}
 	}
 
+	/**
+	 * Sets the parameters of the sort (used in recall and in sort sync)
+	 * @param params the parameters to set
+	 */
 	public recallSort(params: BPSParams): void {
 		this.regions = params.regions;
 		this.radius = params.radius;

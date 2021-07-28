@@ -243,8 +243,14 @@ export default class VolumeSelectorModule {
 		}
 	}
 
-	public recallSort(params: VolSelectParams): void {
-		this.start();
+	/**
+	 * Sets the parameters of the sort (used in recall and in sort sync)
+	 * @param params the parameters to set
+	 */
+	public setParams(params: VolSelectParams): void {
+		if (!this.placingSelector) {
+			this.start();
+		}
 		this.updateBound('minX', params.minX);
 		this.updateBound('maxX', params.maxX);
 		this.updateBound('minY', params.minY);

@@ -30,6 +30,9 @@ type SocketReceiveMsgs = {
 	HIST_ADD: { type: 'HIST_ADD'; newSort: Sort };
 	HIST_DEL: { type: 'HIST_DEL'; id: string };
 	HIST_EDIT: { type: 'HIST_EDIT'; id: string; name: string };
+	VIEW_ADD: { type: 'VIEW_ADD'; newView: View };
+	VIEW_DEL: { type: 'VIEW_DEL'; id: string };
+	VIEW_EDIT: { type: 'VIEW_EDIT'; id: string; name: string };
 	ANN_ADD: { type: 'ANN_ADD'; newAnnotation: RawAnnotation };
 	ANN_DEL: { type: 'ANN_DEL'; mesh: string };
 	START_LIVE: { type: 'START_LIVE'; data: LiveSessionData };
@@ -37,6 +40,9 @@ type SocketReceiveMsgs = {
 	LEAVE_LIVE: { type: 'LEAVE_LIVE'; id: string };
 	CAM_CHANGE: { type: 'CAM_CHANGE'; camPos: RawVector3; camRot: RawVector3 };
 	END_LIVE: { type: 'END_LIVE' };
+	SELECT_MESH: { type: 'SELECT_MESH'; mesh: string };
+	TRANSFER_CONTROL: { type: 'TRANSFER_CONTROL'; id: string };
+	REQUEST_CONTROL: { type: 'REQUEST_CONTROL'; id: string; name: string };
 };
 
 type SocketSendMsgs = {
@@ -46,6 +52,10 @@ type SocketSendMsgs = {
 	LEAVE_LIVE: { type: 'LEAVE_LIVE' };
 	END_LIVE: { type: 'END_LIVE' };
 	CAM_CHANGE: { type: 'CAM_CHANGE'; camPos: RawVector3; camRot: RawVector3 };
+	SELECT_MESH: { type: 'SELECT_MESH'; mesh: string };
+	TRANSFER_CONTROL: { type: 'TRANSFER_CONTROL'; id: string };
+	REVERT_CONTROL: { type: 'REVERT_CONTROL' };
+	REQUEST_CONTROL: { type: 'REQUEST_CONTROL'; id: string };
 };
 
 interface RawVector3 {
@@ -78,6 +88,7 @@ interface Model {
 	modelData: ModelData;
 	sortHist: Sort[];
 	annotations: RawAnnotation[];
+	views: View[];
 	live: boolean;
 	session: null | LiveSessionData;
 }
@@ -264,6 +275,11 @@ interface HistoryContext {
 	deleteSort: (sort: Sort) => void;
 }
 
+interface ViewContext {
+	renameView: (view: View) => void;
+	deleteView: (view: View) => void;
+}
+
 interface LiveParticipant {
 	id: string;
 	name: string;
@@ -271,7 +287,15 @@ interface LiveParticipant {
 
 interface LiveSessionData {
 	hostID: string;
+	controllerID: string;
 	camPos: RawVector3;
 	camRot: RawVector3;
 	participants: LiveParticipant[];
+}
+
+interface View {
+	_id: string;
+	name: string;
+	pos: RawVector3;
+	rot: RawVector3;
 }

@@ -505,6 +505,7 @@ export default class EpiDataModule {
 
 	/** Utility function to get the bush data for a mesh in the "game" (public because might be used outside, later?) */
 	public getBushEntry(mesh: AbstractMesh): ABushData | FBushData {
+		// get the bounding data of the mesh as a starting point
 		const bounds = mesh.getBoundingInfo().boundingBox;
 		const { x: maxX, y: maxY, z: maxZ } = bounds.maximumWorld;
 		const { x: minX, y: minY, z: minZ } = bounds.minimumWorld;
@@ -518,19 +519,23 @@ export default class EpiDataModule {
 					const rawEntry = entry.raw;
 
 					if (isArc) {
+						// if the selected mesh is part of a flag, we need to find which part of the flag it is
 						const type = mesh.name.includes('lines') ? 'lines' : mesh.name.includes('cube') ? 'cubes' : 'tris';
 
-						// Sometimes, selection is imprecise (ie. includes data that isn't rendered), exclude those
 						const renderedArc = this.arcMeshes[rawEntry.id].get(rawEntry as RawArcTrackData);
+						// Sometimes, selection is imprecise (ie. includes data that isn't rendered), ignore those
 						if (!renderedArc) {
 							return false;
 						}
 						if (type === 'lines') {
+							// just run a direct equality check
 							return renderedArc.lines === mesh;
 						} else {
+							// see if any of the cubes or triangles are the selected mesh
 							return renderedArc[type].includes(mesh as Mesh);
 						}
 					} else {
+						// just run a direct equality check
 						return this.flagMeshes[rawEntry.id].get(rawEntry as RawFlagTrackData) === mesh;
 					}
 				}) as ABushData | FBushData
@@ -540,27 +545,38 @@ export default class EpiDataModule {
 	/** Attempts to create the GUI elements for the given annotations */
 	public loadAnnotations(annotations: RawAnnotation[]): void {
 		annotations.forEach((ann) => {
+			// find the mesh that this annotation is supposed to be attached to
 			const mesh = this.scene.getMeshByName(ann.mesh);
+
 			if (mesh) {
+				// create the annotation, but DO NOT notify the server (otherwise data duplication)
 				this.addAnnotation(mesh, ann.text, true);
 			} else {
+				// keep track of the annotations for features out of view range for later loading (otherwise data duplication)
 				this.unloadedAnnotations.push(ann);
 			}
 		});
 	}
 
-	/** Attempts to create the GUI elements for the given annotation */
+	/** Attempts to create the GUI elements for the given annotation, used when getting a socket message from server */
 	public addRawAnnotation(annotation: RawAnnotation): void {
+		// find the mesh that this annotation is supposed to be attached to
 		const mesh = this.scene.getMeshByName(annotation.mesh);
+
 		if (mesh && !this.hasAnnotation(mesh)) {
+			// create the annotation, but DO NOT notify the server (otherwise data duplication)
 			this.addAnnotation(mesh, annotation.text, true);
 		} else {
+			// keep track of the annotations for features out of view range for later loading (otherwise data duplication)
 			this.unloadedAnnotations.push(annotation);
 		}
 	}
 
+	/** Removes any rendering of a raw annotation from the scene */
 	public removeRawAnnotation(meshName: string): void {
+		// find the mesh that this annotation is supposed to be attached to
 		const mesh = this.scene.getMeshByName(meshName);
+
 		if (mesh && this.hasAnnotation(mesh)) {
 			this.removeAnnotation(mesh, true);
 		}
@@ -582,7 +598,7 @@ export default class EpiDataModule {
 			bushEntry.annotation = annotation;
 		}
 
-		// Make annotation BABYLON ui thingy
+		// Make body for the BABYLON gui representation of the annotation
 		const rect = new Rectangle(mesh.name + '-annotation-body');
 		rect.background = 'rgba(0, 0, 0, 0.5)';
 		rect.height = annotation.split('\n').length * 24 + 16 + 'px';
@@ -594,6 +610,7 @@ export default class EpiDataModule {
 				12 +
 			'px';
 
+		// Make the text
 		const text = new TextBlock(mesh.name + '-annotation-text', annotation);
 		text.color = 'white';
 		rect.addControl(text);
@@ -606,9 +623,11 @@ export default class EpiDataModule {
 		// @ts-ignore this is bad, but it makes the code a lot cleaner
 		(isArc ? this.annotatedArcs : this.annotatedFlags).push(bushEntry);
 
+		// Notify console that a new annotation has been added
 		this.events.dispatch('CREATED_ANNOTATION', mesh);
 
 		if (!doNotNotify) {
+			// Notify server that a new annotation has been added
 			axios.post<RawAnnotation[]>(`${BACKEND_URL}/annotations`, { id: this.modelId, annotation: { mesh: mesh.name, text: annotation } });
 		}
 	}
@@ -629,18 +648,25 @@ export default class EpiDataModule {
 		// @ts-ignore this is bad, but it makes the code a lot cleaner
 		(isArc ? this.arcAnnotations : this.flagAnnotations).delete(bushEntry);
 		if (isArc) {
+			// remove from the right list
 			this.annotatedArcs = this.annotatedArcs.filter((data) => data !== bushEntry);
 		} else {
 			this.annotatedFlags = this.annotatedFlags.filter((data) => data !== bushEntry);
 		}
 
+		// Notify console that an annotation has been removed
 		this.events.dispatch('DELETED_ANNOTATION', mesh);
 
 		if (!doNotNotify) {
+			// Notify server that an annotation has been removed
 			axios.delete<RawAnnotation[]>(`${BACKEND_URL}/annotations`, { data: { id: this.modelId, name: mesh.name } });
 		}
 	}
 
+	/**
+	 * Gets detailed information about the epigenetic feature represented by the given mesh
+	 * @param mesh The mesh to get the epigenetic feature information for
+	 */
 	public getInfo(mesh: AbstractMesh): EpiDataFeature {
 		const isArc = mesh.name.startsWith('arc');
 		const bushEntry = this.getBushEntry(mesh);

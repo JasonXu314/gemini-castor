@@ -339,12 +339,21 @@ export default class RadiusSelectorModule {
 		}
 	}
 
-	public recallSort(params: RadSelectParams): void {
-		this.start().then(() => {
+	/**
+	 * Sets the parameters of the sort (used in recall and in sort sync)
+	 * @param params the parameters to set
+	 */
+	public setParams(params: RadSelectParams): void {
+		if (!this.settingParams && !this.initPos) {
+			this.start().then(() => {
+				this.updateRadius(params.radius);
+				this.updatePosition(params.position);
+			});
+			this.canvas.dispatchEvent(new Event('dblclick'));
+		} else {
 			this.updateRadius(params.radius);
 			this.updatePosition(params.position);
-		});
-		this.canvas.dispatchEvent(new Event('dblclick'));
+		}
 	}
 
 	/** Update the position the guide mesh; called by the main game class */

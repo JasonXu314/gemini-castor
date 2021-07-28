@@ -7,7 +7,7 @@
 	import { BACKEND_URL } from '$lib/utils/constants';
 	import { decodeEpiData, decodeRefGenes, decodeStruct } from '$lib/utils/serializations';
 	import MySocket from '$lib/utils/sock';
-	import { historyStore } from '$lib/utils/stores';
+	import { historyStore, viewStore } from '$lib/utils/stores';
 	import { compareSorts } from '$lib/utils/utils';
 	import axios from 'axios';
 	import { onMount, setContext } from 'svelte';
@@ -31,13 +31,20 @@
 	$: historyStore.set(sortHist);
 
 	setContext<HistoryContext>('HISTORY_CONTEXT', {
-		renameSort: (sort: Sort) => {
-			const { _id, name } = sort;
+		renameSort: ({ _id, name }: Sort) => {
 			axios.patch<Sort[]>(`${BACKEND_URL}/history`, { id, _id, name }).catch(() => alert('Failed to rename sort; name will be lost on refresh'));
 		},
-		deleteSort: (sort: Sort) => {
-			const { _id, name } = sort;
+		deleteSort: ({ _id, name }: Sort) => {
 			axios.delete<Sort[]>(`${BACKEND_URL}/history`, { data: { id, _id, name } }).catch(() => alert('Failed to delete sort'));
+		}
+	});
+
+	setContext<ViewContext>('VIEW_CONTEXT', {
+		renameView: ({ _id, name }: View) => {
+			axios.patch<View[]>(`${BACKEND_URL}/views`, { id, _id, name }).catch(() => alert('Failed to rename view; name will be lost on refresh'));
+		},
+		deleteView: ({ _id, name }: View) => {
+			axios.delete<View[]>(`${BACKEND_URL}/views`, { data: { id, _id, name } }).catch(() => alert('Failed to delete view'));
 		}
 	});
 
@@ -100,6 +107,7 @@
 						res.data.annotations
 					);
 					sortHist = res.data.sortHist;
+					viewStore.set(res.data.views);
 					game.start();
 					game.events.on('RESET', (sort) => {
 						if (!sortHist.some((existingSort) => compareSorts(existingSort, sort))) {
@@ -123,10 +131,16 @@
 						'HIST_ADD',
 						'HIST_DEL',
 						'HIST_EDIT',
+						'VIEW_ADD',
+						'VIEW_DEL',
+						'VIEW_EDIT',
 						'START_LIVE',
 						'JOIN_LIVE',
 						'LEAVE_LIVE',
-						'CAM_CHANGE'
+						'CAM_CHANGE',
+						'SELECT_MESH',
+						'TRANSFER_CONTROL',
+						'REQUEST_CONTROL'
 					]);
 
 					mainSock.send({ type: 'LINK', id: res.data.socketId, roomId: id });
@@ -151,6 +165,19 @@
 							return sort;
 						});
 					});
+
+					mainSock.on('VIEW_ADD', ({ newView }) => viewStore.update((prevViews) => [...prevViews, newView]));
+					mainSock.on('VIEW_DEL', ({ id }) => viewStore.update((prevViews) => prevViews.filter((view) => view._id !== id)));
+					mainSock.on('VIEW_EDIT', ({ id, name }) =>
+						viewStore.update((prevViews) =>
+							prevViews.map((view) => {
+								if (view._id === id) {
+									view.name = name;
+								}
+								return view;
+							})
+						)
+					);
 
 					mainSock.on('ANN_ADD', ({ newAnnotation }) => {
 						game.epiData.addRawAnnotation(newAnnotation);

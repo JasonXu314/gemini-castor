@@ -17,7 +17,7 @@ import BasePairSelectorModule from './bps';
 import EpiDataModule from './epiData';
 import RadiusSelectorModule from './radiusSelector';
 import StructureModule from './structure';
-import { compareVectors, EventSrc, findShortest, Logger, serializeParams2, serializeParams3, strictCompareVectors } from './utils/utils';
+import { compareVectors, EventSrc, findShortest, Logger, modColor, serializeParams2, serializeParams3, strictCompareVectors } from './utils/utils';
 import VolumeSelectorModule from './volumeSelector';
 
 interface GameLiteEvents {
@@ -185,7 +185,7 @@ export default class GameLite {
 		// this.epiData.renderArcs(Object.values(this.epiData.arcTracks).reduce((arr, track) => [...arr, ...track.data], []));
 		this.epiData.renderArcs(this.epiData.defaultArcData);
 
-		// Loading in existing annotations
+		// Loading in existing annotations, but only after things are rendered for the first time
 		setTimeout(() => {
 			this.epiData.loadAnnotations(annotations);
 		}, 0);
@@ -199,47 +199,60 @@ export default class GameLite {
 		this.scene.onPointerDown = (evt) => {
 			if (!this.radSelect.initPos && (evt.button === 0 || evt.button === 2)) {
 				if (this.hoverMesh) {
+					// Keep track of the mesh the mouse was over when mousing down
 					const downMesh = this.hoverMesh;
 
 					this.scene.onPointerMove = () => {
 						if (!this.hoverMesh) {
+							// If the cursor ever leaves the mesh that was moused down on, we can ignore the sequence, as it should not select a mesh
 							this.scene.onPointerUp = undefined;
 							this.scene.onPointerMove = undefined;
 						}
 					};
 					this.scene.onPointerUp = (evt) => {
+						// if left button click and the mouse is still over the same mesh, AND the mesh is not already selected
 						if (evt.button === 0 && this.hoverMesh && this.hoverMesh === downMesh && this.selectedMesh !== downMesh) {
 							if (this.selectedMesh) {
+								// if a mesh is already selected, fix the color
 								(this.selectedMesh.material as StandardMaterial).diffuseColor = this.selectedOriginalColor;
 							}
 							this.selectedMesh = downMesh;
 							this.selectedOriginalColor = this.originalColor;
 
+							// tell the console that the user clicked on a mesh
 							// @ts-ignore no clue why ts fucks up here, but it should work nonetheless
 							this.events.dispatch('SELECT_FEATURE', this.epiData.getInfo(this.selectedMesh));
 						}
+						// if right button click and the mouse is still over the same mesh
 						if (evt.button === 2 && this.hoverMesh === downMesh && this.selectedMesh) {
-							this.events.dispatch('DESELECT_FEATURE');
 							(this.selectedMesh.material as StandardMaterial).diffuseColor = this.selectedOriginalColor;
 							this.selectedMesh = null;
 							this.selectedOriginalColor = null;
+
+							// tell the console that the user deselected the mesh
+							this.events.dispatch('DESELECT_FEATURE');
 						}
 						this.scene.onPointerUp = undefined;
 						this.scene.onPointerMove = undefined;
 					};
+					// if the mouse is not over a mesh, and the user is right clicking
 				} else if (evt.button === 2) {
 					this.scene.onPointerMove = () => {
 						if (this.hoverMesh) {
+							// if the user ever goes over a mesh, we should not deselect the current selected mesh
 							this.scene.onPointerUp = undefined;
 							this.scene.onPointerMove = undefined;
 						}
 					};
 					this.scene.onPointerUp = (evt) => {
+						// if the user has right clicked on empty space
 						if (evt.button === 2 && !this.hoverMesh) {
-							this.events.dispatch('DESELECT_FEATURE');
 							(this.selectedMesh.material as StandardMaterial).diffuseColor = this.selectedOriginalColor;
 							this.selectedMesh = null;
 							this.selectedOriginalColor = null;
+
+							// tell the console that the user deselected the mesh
+							this.events.dispatch('DESELECT_FEATURE');
 						}
 						this.scene.onPointerUp = undefined;
 						this.scene.onPointerMove = undefined;
@@ -248,12 +261,13 @@ export default class GameLite {
 			}
 		};
 
+		// Listen for when the user wants to recall a sort (also hijacked for sort sync feature)
 		this.events.on('RECALL_SORT', (sort: Sort) => {
 			if (sort.radSelect) {
-				this.radSelect.recallSort(sort.radSelect);
+				this.radSelect.setParams(sort.radSelect);
 			}
 			if (sort.volSelect) {
-				this.volSelect.recallSort(sort.volSelect);
+				this.volSelect.setParams(sort.volSelect);
 			}
 			if (sort.bpsSelect) {
 				this.bpsSelect.recallSort(sort.bpsSelect);
@@ -417,6 +431,7 @@ export default class GameLite {
 	/** Resets the active sorts; should be the ONLY time that .reset is called on the sorts with the override true */
 	public reset(): void {
 		if (this.sortsActive) {
+			// Save the data of the sorts that were just cleared
 			const sort: Sort = {
 				_id: uuid(),
 				name: `Sort ${this.sortsDone}`,
@@ -448,6 +463,7 @@ export default class GameLite {
 					: null
 			};
 
+			// Force reset the sorts that were active
 			if (this.radSelect.active) {
 				this.radSelect.reset(true);
 			}
@@ -457,14 +473,18 @@ export default class GameLite {
 			if (this.bpsSelect.active) {
 				this.bpsSelect.reset(true);
 			}
+			// Reset any of the sorts that were not
 			this.radSelect.reset();
 			this.volSelect.reset();
 			this.bpsSelect.reset();
+
+			// Reset the structure & epi data
 			this.structure.renderStruct(this.structure.defaultStructureData);
 			this.epiData.renderArcs(this.epiData.defaultArcData);
 			this.epiData.renderFlags(this.epiData.defaultFlagData, 80);
 			this.sortsActive = false;
 
+			// Notify console that sorts were reset
 			this.events.dispatch('RESET', sort);
 		}
 	}
@@ -480,16 +500,20 @@ export default class GameLite {
 					this.radSelect.updateGuide();
 				}
 
+				// If the camera changed a significant amount, tell the console that (used for live session camera syncing)
 				if (!compareVectors(this.camera.position, this.prevCamPos) || !strictCompareVectors(this.camera.rotation, this.prevCamRot)) {
 					this.events.dispatch('CAM_CHANGE');
 					this.prevCamPos = this.camera.position.clone();
 					this.prevCamRot = this.camera.rotation.clone();
 				}
 
+				// Raycasting for mesh selection & hover lighting effects
 				const hit = this.scene.pick(this.scene.pointerX, this.scene.pointerY);
 				if (hit.hit) {
 					if (this.hoverMesh && this.hoverMesh !== hit.pickedMesh) {
+						// If the cursor was already hovering on a mesh that isn't the currently hovered mesh, "dehover" it first
 						if (this.hoverMesh !== this.selectedMesh) {
+							// If the previously hovered mesh is NOT the selected mesh, revert the color
 							(this.hoverMesh.material as StandardMaterial).diffuseColor = this.originalColor;
 							this.originalColor = null;
 						}
@@ -497,22 +521,20 @@ export default class GameLite {
 					}
 
 					if (!this.hoverMesh) {
+						// If the cursor is not currently hovering on a mesh, keep track of it
 						if (hit.pickedMesh !== this.selectedMesh) {
+							// if the currently hovered mesh is NOT already selected, modify its color to indicate that it is being hovered on
 							this.originalColor = (hit.pickedMesh.material as StandardMaterial).diffuseColor;
-							const { r, g, b } = this.originalColor;
-							const rgbTotal = r * 0.75 + g * 2 + b * 0.75;
-							(hit.pickedMesh.material as StandardMaterial).diffuseColor = new Color3(
-								rgbTotal < 1.75 ? r * 2 : r / 2,
-								rgbTotal < 1.75 ? g * 2 : g / 2,
-								rgbTotal < 1.75 ? b * 2 : b / 2
-							);
+							(hit.pickedMesh.material as StandardMaterial).diffuseColor = modColor(this.originalColor);
 						}
 						this.hoverMesh = hit.pickedMesh;
 						this.canvas.classList.add('cp');
 					}
 				} else if (this.hoverMesh) {
+					// If the cursor is NOT hovering on a mesh, but previously was, dehover it
 					if (this.selectedMesh !== this.hoverMesh) {
-						(this.hoverMesh.material as StandardMaterial).diffuseColor = this.originalColor.clone();
+						// If the previously hovered mesh is NOT the selected mesh, revert the color
+						(this.hoverMesh.material as StandardMaterial).diffuseColor = this.originalColor;
 						this.originalColor = null;
 					}
 					this.hoverMesh = null;
@@ -520,6 +542,41 @@ export default class GameLite {
 				}
 			});
 			this.running = true;
+		}
+	}
+
+	/**
+	 * Programmatically selects a mesh by name, used by selection sync feature
+	 * @param name the name of the mesh
+	 */
+	public selectMesh(name: string): void {
+		const mesh = this.scene.getMeshByName(name);
+
+		if (this.selectedMesh === mesh) {
+			// no need to change anything
+			return;
+		}
+
+		if (this.selectedMesh) {
+			// if the currently selected mesh is not the same as the mesh we want to select, revert the color
+			this.hoverMesh = this.selectedMesh;
+			this.originalColor = this.selectedOriginalColor;
+		}
+
+		// select the mesh (same as above)
+		if (this.hoverMesh && this.hoverMesh === mesh) {
+			this.selectedMesh = mesh;
+			this.selectedOriginalColor = this.originalColor;
+
+			// @ts-ignore no clue why ts fucks up here, but it should work nonetheless
+			this.events.dispatch('SELECT_FEATURE', this.epiData.getInfo(this.selectedMesh));
+		} else {
+			this.selectedMesh = mesh;
+			this.selectedOriginalColor = (mesh.material as StandardMaterial).diffuseColor;
+			(mesh.material as StandardMaterial).diffuseColor = modColor(this.selectedOriginalColor);
+
+			// @ts-ignore no clue why ts fucks up here, but it should work nonetheless
+			this.events.dispatch('SELECT_FEATURE', this.epiData.getInfo(this.selectedMesh));
 		}
 	}
 
@@ -540,6 +597,7 @@ export default class GameLite {
 		}
 	}
 
+	/** Stops the game and releases all resources */
 	public destroy(): void {
 		if (this.running) {
 			this.stop();
@@ -548,13 +606,22 @@ export default class GameLite {
 		this.scene.dispose();
 	}
 
+	/** Renders 1 frame of the game, to generate an image for the previews in the gallery */
 	public async preview(): Promise<void> {
+		// wait for the structure to finish rendering (async because points cloud system)
 		await this.renderStructure;
+
+		// wait 1 frame for stuff to render, to allow annotations to render
 		setTimeout(() => {
 			this.scene.render();
 		}, 0);
 	}
 
+	/**
+	 * Prompts the user for a name for the new annotation
+	 * @param defName the default name of the annotation
+	 * @return a promise that resolves to the name of new annotation
+	 */
 	public async getAnnotationName(defName: string): Promise<string> {
 		this.events.dispatch('START_SET_ANN_NAME', defName);
 

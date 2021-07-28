@@ -1,5 +1,6 @@
 <script lang="ts">
 	import Button from '$lib/components/Button.svelte';
+	import ControlRequest from '$lib/components/ControlRequest.svelte';
 	import FancyInput from '$lib/components/FancyInput.svelte';
 	import type GameLite from '$lib/game';
 	import { Vector3 } from '$lib/utils/babylon';
@@ -15,12 +16,16 @@
 		hasLive: boolean = false,
 		inSession: boolean = false,
 		hostId: string | null = null,
+		controllerId: string | null = null,
 		participants: LiveParticipant[] = [],
+		transferControl: boolean = false,
+		controlRequests: LiveParticipant[] = [],
 		unsub: () => void | null;
 
 	$: hasLive = !!liveSession;
 	$: participants = liveSession ? liveSession.participants : [];
 	$: hostId = liveSession ? liveSession.hostID : null;
+	$: controllerId = liveSession ? liveSession.controllerID : null;
 
 	$: {
 		if (liveSession) {
@@ -52,15 +57,11 @@
 
 		if (data.hostID === socketId) {
 			inSession = true;
-			game.events.on('CAM_CHANGE', () => {
-				const { x, y, z } = game.camera.position;
-				const { x: rx, y: ry, z: rz } = game.camera.rotation;
 
-				socket.send({
-					type: 'CAM_CHANGE',
-					camPos: { x, y, z },
-					camRot: { x: rx, y: ry, z: rz }
-				});
+			socket.on('REQUEST_CONTROL', ({ id, name }) => {
+				if (!controlRequests.find(({ id: _id }) => _id === id)) {
+					controlRequests = [...controlRequests, { id, name }];
+				}
 			});
 		}
 	});
@@ -80,19 +81,6 @@
 				unsub();
 			}
 			unsub = null;
-
-			socket.on('CAM_CHANGE', ({ camPos, camRot }) => {
-				const { x, y, z } = camPos;
-				const { x: rx, y: ry, z: rz } = camRot;
-
-				game.camera.position = new Vector3(x, y, z);
-				game.camera.rotation = new Vector3(rx, ry, rz);
-				game.camera.inertia = 0;
-
-				setTimeout(() => {
-					game.camera.inertia = 0.75;
-				}, 0);
-			});
 		}
 	});
 
@@ -101,11 +89,61 @@
 		if (id === socketId) {
 			inSession = false;
 		}
+		if (id === controllerId) {
+			controllerId = hostId;
+		}
 	});
 
 	socket.on('END_LIVE', () => {
 		liveSession = null;
 		inSession = false;
+	});
+
+	socket.on('TRANSFER_CONTROL', ({ id }) => {
+		controllerId = id;
+	});
+
+	socket.on('CAM_CHANGE', ({ camPos, camRot }) => {
+		if (inSession && controllerId !== socketId) {
+			const { x, y, z } = camPos;
+			const { x: rx, y: ry, z: rz } = camRot;
+
+			game.camera.position = new Vector3(x, y, z);
+			game.camera.rotation = new Vector3(rx, ry, rz);
+			game.camera.inertia = 0;
+
+			setTimeout(() => {
+				game.camera.inertia = 0.75;
+			}, 0);
+		}
+	});
+
+	socket.on('SELECT_MESH', ({ mesh }) => {
+		if (inSession && controllerId !== socketId) {
+			game.selectMesh(mesh);
+		}
+	});
+
+	game.events.on('CAM_CHANGE', () => {
+		if (inSession && controllerId === socketId) {
+			const { x, y, z } = game.camera.position;
+			const { x: rx, y: ry, z: rz } = game.camera.rotation;
+
+			socket.send({
+				type: 'CAM_CHANGE',
+				camPos: { x, y, z },
+				camRot: { x: rx, y: ry, z: rz }
+			});
+		}
+	});
+
+	game.events.on('SELECT_FEATURE', (selectedFeature: EpiDataFeature) => {
+		if (inSession && controllerId === socketId) {
+			socket.send({
+				type: 'SELECT_MESH',
+				mesh: selectedFeature.mesh.name
+			});
+		}
 	});
 </script>
 
@@ -156,11 +194,72 @@
 	<div class="participants">
 		{#each participants as participant}
 			<div class="participant">
-				<h4 class="name">{participant.name}</h4>
+				<div class="top">
+					<h4 class="name">{participant.name}</h4>
+					{#if transferControl && socketId !== participant.id}
+						<Button
+							smol
+							type="action"
+							on:click={() => {
+								socket.send({ type: 'TRANSFER_CONTROL', id: participant.id });
+								transferControl = false;
+							}}>Transfer</Button
+						>
+					{/if}
+				</div>
 				<small class="id">{participant.id}</small>
 			</div>
 		{/each}
 	</div>
+	{#if hasLive && inSession}
+		<div class="btns">
+			{#if hostId === socketId && controllerId === socketId}
+				<Button
+					type={transferControl ? 'cancel' : 'action'}
+					on:click={() => {
+						transferControl = !transferControl;
+					}}>{transferControl ? 'Cancel' : 'Transfer Control'}</Button
+				>
+			{:else if hostId === socketId && controllerId !== socketId}
+				<Button
+					type="cancel"
+					on:click={() => {
+						socket.send({ type: 'REVERT_CONTROL' });
+					}}>Reclaim Control</Button
+				>
+			{:else if hostId !== socketId && controllerId === socketId}
+				<Button
+					type="cancel"
+					on:click={() => {
+						socket.send({ type: 'REVERT_CONTROL' });
+					}}>Release Control</Button
+				>
+			{:else}
+				<Button
+					type="action"
+					on:click={() => {
+						socket.send({ type: 'REQUEST_CONTROL', id: socketId });
+					}}>Request Control</Button
+				>
+			{/if}
+		</div>
+	{/if}
+	{#if hostId === socketId}
+		<div class="req-container">
+			{#each controlRequests as req}
+				<ControlRequest
+					{req}
+					accept={() => {
+						socket.send({ type: 'TRANSFER_CONTROL', id: req.id });
+						controlRequests = controlRequests.filter((r) => r.id !== req.id);
+					}}
+					deny={() => {
+						controlRequests = controlRequests.filter((r) => r.id !== req.id);
+					}}
+				/>
+			{/each}
+		</div>
+	{/if}
 </div>
 
 <style>
@@ -179,10 +278,10 @@
 	.participants {
 		display: flex;
 		flex-direction: column;
-		margin-left: 2em;
+		margin: 0 2em;
 		overflow-x: hidden;
 		overflow-y: scroll;
-		max-height: 200px;
+		max-height: 300px;
 		padding-bottom: 1px;
 	}
 
@@ -197,7 +296,26 @@
 		margin-bottom: -1px;
 	}
 
-	.participants .participant .id {
+	.top {
+		display: flex;
+		flex-direction: row;
+		justify-content: space-between;
+	}
+
+	.id {
 		font-size: xx-small;
+	}
+
+	.btns {
+		display: flex;
+		flex-direction: column;
+	}
+
+	.req-container {
+		position: fixed;
+		top: 0;
+		right: 0;
+		display: flex;
+		flex-direction: column;
 	}
 </style>

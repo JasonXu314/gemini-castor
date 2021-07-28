@@ -1,7 +1,7 @@
-import type { Vector3 } from 'babylonjs';
 import type BasePairSelectorModule from '../bps';
 import type RadiusSelectorModule from '../radiusSelector';
 import type VolumeSelectorModule from '../volumeSelector';
+import { Color3, Vector3 } from './babylon';
 
 type SelectorModule = VolumeSelectorModule | RadiusSelectorModule | BasePairSelectorModule;
 
@@ -68,6 +68,12 @@ export function findShortest<T>(...arrs: T[][]): [T[], T[][]] {
 	return [short, [...arrs.slice(0, idx), ...arrs.slice(idx + 1)]];
 }
 
+/**
+ * Compares 2 sorts to see if they are functionally equivalent
+ * @param a the first sort
+ * @param b the second sort
+ * @returns true if they are equivalent
+ */
 export function compareSorts(a: Sort, b: Sort): boolean {
 	if ((a.radSelect && !b.radSelect) || (!a.radSelect && b.radSelect)) {
 		// if one is null, and the other isn't
@@ -124,12 +130,34 @@ export function compareSorts(a: Sort, b: Sort): boolean {
 	return true;
 }
 
+/**
+ * Compare vectors with higher precision requirements (using ===)
+ * @param v1 first vector
+ * @param v2 second vector
+ * @returns true if the vectors are equal
+ */
 export function strictCompareVectors(v1: Vector3, v2: Vector3): boolean {
 	return (!v1 && !v2) || (v1 && v2 && v1.x === v2.x && v1.y === v2.y && v1.z === v2.z);
 }
 
+/**
+ * Compare vectors (with some margin of error)
+ * @param v1 first vector
+ * @param v2 second vector
+ * @returns true if the vectors are equal
+ */
 export function compareVectors(v1: Vector3, v2: Vector3): boolean {
 	return (!v1 && !v2) || (v1 && v2 && Math.abs(v1.x - v2.x) < 1 && Math.abs(v1.y - v2.y) < 1 && Math.abs(v1.z - v2.z) < 1);
+}
+
+/**
+ * Creates a contrasting color for the given color to indicate selection to the user
+ * @param color the color to contrast
+ */
+export function modColor(color: Color3): Color3 {
+	const { r, g, b } = color;
+	const rgbTotal = r * 0.75 + g * 2 + b * 0.75;
+	return new Color3(rgbTotal < 1.75 ? r * 2 : r / 2, rgbTotal < 1.75 ? g * 2 : g / 2, rgbTotal < 1.75 ? b * 2 : b / 2);
 }
 
 /**
@@ -225,37 +253,58 @@ export class Logger {
 	}
 }
 
+/**
+ * Serializes the parameters in 2 selectors, used for cacheing of sort results for faster repeated performance
+ * @param a the first selector
+ * @param b the second selector
+ * @returns a serialized string of the parameters
+ */
 export function serializeParams2(a: SelectorModule, b: SelectorModule): string {
 	let part1: string | null = null;
 	let part2: string | null = null;
 
 	if ('maxX' in a) {
+		// a is a volume selector, and should be prioritized
 		part1 = `${a.maxX},${a.maxY},${a.maxZ},${a.minX},${a.minY},${a.minZ}`;
 	} else if ('maxX' in b) {
+		// b is a volume selector, and should be prioritized
 		part2 = `${b.maxX},${b.maxY},${b.maxZ},${b.minX},${b.minY},${b.minZ}`;
 	}
 	if ('position' in a) {
 		if (!part1) {
+			// a is a radius selector, and should be prioritized
 			part1 = `${a.position.x},${a.position.y},${a.position.z},${a.radius}`;
 		} else {
+			// but not above volume selector
 			part2 = `${a.position.x},${a.position.y},${a.position.z},${a.radius}`;
 		}
 	} else if ('position' in b) {
 		if (!part1) {
+			// b is a radius selector, and should be prioritized
 			part1 = `${b.position.x},${b.position.y},${b.position.z},${b.radius}`;
 		} else {
+			// but not above volume selector
 			part2 = `${b.position.x},${b.position.y},${b.position.z},${b.radius}`;
 		}
 	}
 	if ('regions' in a) {
+		// there is already guaranteed to be a part1, so just assign the parameters to part 2 since a is a base pair selector
 		part2 = `${a.regions},${a.radius}`;
 	} else if ('regions' in b) {
+		// same with b
 		part2 = `${b.regions},${b.radius}`;
 	}
 
 	return part1 + ';' + part2;
 }
 
+/**
+ * Serializes the parameters for all 3 selectors, used for cacheing of sort results for faster repeated performance
+ * @param a the volume selector
+ * @param b the radius selector
+ * @param c the base pair selector
+ * @returns a serialized string of the parameters
+ */
 export function serializeParams3(a: VolumeSelectorModule, b: RadiusSelectorModule, c: BasePairSelectorModule): string {
 	const part1 = `${a.maxX},${a.maxY},${a.maxZ},${a.minX},${a.minY},${a.minZ}`;
 	const part2 = `${b.position.x},${b.position.y},${b.position.z},${b.radius}`;

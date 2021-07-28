@@ -28,9 +28,14 @@
 		padding: 0.5em 1em;
 		display: flex;
 		flex-direction: row;
+		overflow-x: scroll;
 	}
 
 	.console.hidden {
 		display: none;
+	}
+
+	.console::-webkit-scrollbar {
+		height: 0;
 	}
 </style>

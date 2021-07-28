@@ -2,7 +2,6 @@
 	import type GameLite from '$lib/game';
 	import Button from '../../Button.svelte';
 
-
 	export let game: GameLite;
 	export let closed: boolean;
 
@@ -49,7 +48,17 @@
 					</div>
 				</div>
 				<div class="right">
-					<Button type="action">View</Button>
+					<Button
+						type="action"
+						on:click={() => {
+							const boundingInfo = selectedFeature.mesh.getBoundingInfo().boundingSphere;
+							const meshPos = boundingInfo.center;
+							const rad = boundingInfo.radius;
+							const camToPos = game.camera.position.subtract(meshPos);
+							game.camera.setTarget(meshPos);
+							game.camera.position = game.camera.position.subtract(camToPos.scale((camToPos.length() - (rad + 2500)) / camToPos.length()));
+						}}>View</Button
+					>
 					<Button
 						type={hasAnnotation ? 'cancel' : 'action'}
 						on:click={() => {
@@ -91,7 +100,17 @@
 					<div class="info">{selectedFeature.data.score}</div>
 				</div>
 				<div class="right">
-					<Button type="action">View</Button>
+					<Button
+						type="action"
+						on:click={() => {
+							const boundingInfo = selectedFeature.mesh.getBoundingInfo().boundingSphere;
+							const meshPos = boundingInfo.center;
+							const rad = boundingInfo.radius;
+							const camToPos = game.camera.position.subtract(meshPos);
+							game.camera.setTarget(meshPos);
+							game.camera.position = game.camera.position.subtract(camToPos.scale((camToPos.length() - (rad + 2500)) / camToPos.length()));
+						}}>View</Button
+					>
 					<Button
 						type="action"
 						on:click={() => {

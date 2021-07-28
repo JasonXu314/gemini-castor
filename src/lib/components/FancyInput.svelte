@@ -14,7 +14,7 @@
 	<input
 		class:dark
 		class="input"
-		class:contentful={value !== ''}
+		class:contentful={!!value}
 		type="text"
 		name={id}
 		{id}
