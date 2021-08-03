@@ -11,7 +11,7 @@ export default class BasePairSelectorModule {
 
 	/** Caches of results, for faster recollection */
 	private structCache: Record<string, RawStructureCoord[]>;
-	private epiDataCache: Record<string, RawEpiData>;
+	private epiDataCache: Record<string, RenderEpiData>;
 
 	/** Chromosome regions to select on */
 	public regions: string | null;
@@ -148,7 +148,7 @@ export default class BasePairSelectorModule {
 	 * @returns the epiData features found by the selector
 	 * TODO: add cacheing for results (allows for faster recall times (hopefully))
 	 */
-	public selectEpiData(params?: BPSParams): RawEpiData {
+	public selectEpiData(params?: BPSParams): RenderEpiData {
 		// Grab sort parameters, taking params object as priority, but defaulting to use the selector module's parameters
 		const { regions, radius } = params || this;
 
@@ -164,7 +164,7 @@ export default class BasePairSelectorModule {
 				.split(';')
 				.map((str) => str.split(':')[1])
 				.map((segment) => ({ start: parseInt(segment.split('-')[0]), stop: parseInt(segment.split('-')[1]) })),
-			out: RawEpiData = { arcs: [], flags: [] };
+			out: RenderEpiData = { arcs: [], flags: [] };
 
 		bounds.forEach(({ start, stop }) => {
 			// Find structure Indices

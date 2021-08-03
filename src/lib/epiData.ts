@@ -100,68 +100,52 @@ export default class EpiDataModule {
 	 * TODO: implement k-means clustering for (hopefully) faster search times
 	 */
 	public generateEpiData(): void {
-		this.data.flags.forEach((trackData, i) => {
-			const { x: sx, y: sy, z: sz } = trackData.startPos;
-			const { x: ex, y: ey, z: ez } = trackData.stopPos;
+		let flagIndex = 0;
+		this.data.flags.forEach((track) => {
+			track.data.forEach((trackData) => {
+				const { x: sx, y: sy, z: sz } = trackData.startPos;
+				const { x: ex, y: ey, z: ez } = trackData.stopPos;
 
-			this.flagBush.insert({
-				maxX: Math.max(sx, ex),
-				minX: Math.min(sx, ex),
-				maxY: Math.max(sy, ey),
-				minY: Math.min(sy, ey),
-				maxZ: Math.max(sz, ez),
-				minZ: Math.min(sz, ez),
-				raw: trackData,
-				annotation: null
+				this.flagBush.insert({
+					maxX: Math.max(sx, ex),
+					minX: Math.min(sx, ex),
+					maxY: Math.max(sy, ey),
+					minY: Math.min(sy, ey),
+					maxZ: Math.max(sz, ez),
+					minZ: Math.min(sz, ez),
+					raw: trackData,
+					annotation: null
+				});
+				this.flagIndexMap.set(trackData, flagIndex++);
 			});
-			if (trackData.id in this.flagTracks) {
-				const track = this.flagTracks[trackData.id];
-				track.data.push(trackData);
-				if (trackData.value > track.max) {
-					track.max = trackData.value;
-				}
-			} else {
-				this.flagTracks[trackData.id] = {
-					data: [trackData],
-					max: trackData.value,
-					color: { r: Math.random(), g: Math.random(), b: Math.random() }
-				};
-			}
-
-			this.flagIndexMap.set(trackData, i);
+			this.flagTracks[track.id] = track;
 		});
 
-		this.data.arcs.forEach((trackData, i) => {
-			const { x: s1x, y: s1y, z: s1z } = trackData.startPos1;
-			const { x: e1x, y: e1y, z: e1z } = trackData.stopPos1;
-			const { x: s2x, y: s2y, z: s2z } = trackData.startPos2;
-			const { x: e2x, y: e2y, z: e2z } = trackData.stopPos2;
+		let arcIndex = 0;
+		this.data.arcs.forEach((track) => {
+			track.data.forEach((trackData) => {
+				const { x: s1x, y: s1y, z: s1z } = trackData.startPos1;
+				const { x: e1x, y: e1y, z: e1z } = trackData.stopPos1;
+				const { x: s2x, y: s2y, z: s2z } = trackData.startPos2;
+				const { x: e2x, y: e2y, z: e2z } = trackData.stopPos2;
 
-			this.arcBush.insert({
-				maxX: Math.max(s1x, e1x, s2x, e2x),
-				minX: Math.min(s1x, e1x, s2x, e2x),
-				maxY: Math.max(s1y, e1y, s2y, e2y),
-				minY: Math.min(s1y, e1y, s2y, e2y),
-				maxZ: Math.max(s1z, e1z, s2z, e2z),
-				minZ: Math.min(s1z, e1z, s2z, e2z),
-				raw: trackData,
-				annotation: null
+				this.arcBush.insert({
+					maxX: Math.max(s1x, e1x, s2x, e2x),
+					minX: Math.min(s1x, e1x, s2x, e2x),
+					maxY: Math.max(s1y, e1y, s2y, e2y),
+					minY: Math.min(s1y, e1y, s2y, e2y),
+					maxZ: Math.max(s1z, e1z, s2z, e2z),
+					minZ: Math.min(s1z, e1z, s2z, e2z),
+					raw: trackData,
+					annotation: null
+				});
+				this.arcIndexMap.set(trackData, arcIndex++);
 			});
-			if (trackData.id in this.arcTracks) {
-				const track = this.arcTracks[trackData.id];
-				track.data.push(trackData);
-				if (trackData.score > track.max) {
-					track.max = trackData.score;
-				}
-			} else {
-				this.arcTracks[trackData.id] = { data: [trackData], max: trackData.score, color: { r: Math.random(), g: Math.random(), b: Math.random() } };
-			}
-
-			this.arcIndexMap.set(trackData, i);
+			this.arcTracks[track.id] = track;
 		});
 
-		this.defaultFlagData = this.data.flags;
-		this.defaultArcData = this.data.arcs;
+		this.defaultFlagData = this.data.flags.reduce((acc, flag) => [...acc, ...flag.data], []);
+		this.defaultArcData = this.data.arcs.reduce((acc, arc) => [...acc, ...arc.data], []);
 	}
 
 	/**
@@ -245,7 +229,7 @@ export default class EpiDataModule {
 			const { r, g, b } = this.flagTracks[flag.id].color;
 
 			const mat = new StandardMaterial('flag-mat', this.scene);
-			mat.diffuseColor = new Color3(r, g, b);
+			mat.diffuseColor = new Color3(r / 255, g / 255, b / 255);
 			mat.freeze();
 			mesh.material = mat;
 
@@ -368,7 +352,7 @@ export default class EpiDataModule {
 				this.addAnnotation(linesMesh, annotation.text, true);
 			}
 			const { r: lmr, g: lmg, b: lmb } = this.arcTracks[arc.id].color;
-			linesMesh.color = new Color3(lmr, lmg, lmb);
+			linesMesh.color = new Color3(lmr / 255, lmg / 255, lmb / 255);
 			// Optimize
 			// mesh.freezeWorldMatrix();
 			// mesh.doNotSyncBoundingInfo = true;

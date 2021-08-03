@@ -5,12 +5,13 @@
 	import FancyInput from '$lib/components/FancyInput.svelte';
 	import GameLite from '$lib/game';
 	import { BACKEND_URL } from '$lib/utils/constants';
-	import { decodeEpiData, decodeRefGenes, decodeStruct } from '$lib/utils/serializations';
+	import { decodeEpiData,decodeRefGenes,decodeStruct } from '$lib/utils/serializations';
 	import MySocket from '$lib/utils/sock';
-	import { historyStore, viewStore } from '$lib/utils/stores';
+	import { historyStore,viewStore } from '$lib/utils/stores';
 	import { compareSorts } from '$lib/utils/utils';
 	import axios from 'axios';
-	import { onMount, setContext } from 'svelte';
+	import { onMount,setContext } from 'svelte';
+
 
 	let canvas: HTMLCanvasElement,
 		game: GameLite,
@@ -81,7 +82,7 @@
 						});
 					}),
 					axios.get<Blob>(`${BACKEND_URL}/${id}.epi`, { responseType: 'blob' }).then((res) => {
-						return new Promise<{ arcs: RawArcTrackData[]; flags: RawFlagTrackData[] }>((resolve) => {
+						return new Promise<{ arcs: ArcTrackLite[]; flags: FlagTrackLite[] }>((resolve) => {
 							const fr = new FileReader();
 
 							fr.onloadend = () => {

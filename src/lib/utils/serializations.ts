@@ -14,92 +14,176 @@ export function decodeStruct(buffer: ArrayBuffer): RawStructureCoord[] {
 	return coords;
 }
 
-export function decodeEpiData(buffer: ArrayBuffer): { arcs: RawArcTrackData[]; flags: RawFlagTrackData[] } {
-	const data: { arcs: RawArcTrackData[]; flags: RawFlagTrackData[] } = {
+export function decodeEpiData(buffer: ArrayBuffer): { flags: FlagTrackLite[]; arcs: ArcTrackLite[] } {
+	const data: { flags: FlagTrackLite[]; arcs: ArcTrackLite[] } = {
 		arcs: [],
 		flags: []
 	};
 	const buf = new DataView(buffer);
 
 	let idx = 0;
+
+	const arcNames: string[] = [],
+		flagNames: string[] = [];
+
+	let arcName = '',
+		flagName = '';
+
+	while (true) {
+		const char = buf.getUint8(idx);
+		idx++;
+
+		if (char === 0) {
+			if (arcName === '') {
+				break;
+			} else {
+				arcNames.push(arcName);
+				arcName = '';
+			}
+		} else {
+			arcName += String.fromCharCode(char);
+		}
+	}
+
+	while (true) {
+		const char = buf.getUint8(idx);
+		idx++;
+
+		if (char === 0) {
+			if (flagName === '') {
+				break;
+			} else {
+				flagNames.push(flagName);
+				flagName = '';
+			}
+		} else {
+			flagName += String.fromCharCode(char);
+		}
+	}
+
 	const arcChr = buf.getInt8(idx);
 	idx++;
 
+	let arcIdx = 0;
 	while (true) {
-		const locus1Start = buf.getUint32(idx, true);
-		const locus1End = buf.getUint32(idx + 4, true);
-		const locus2Start = buf.getUint32(idx + 8, true);
-		const locus2End = buf.getUint32(idx + 12, true);
-		const score = buf.getUint16(idx + 16, true);
-		const arc1StartX = buf.getFloat32(idx + 18, true);
-		const arc1StartY = buf.getFloat32(idx + 22, true);
-		const arc1StartZ = buf.getFloat32(idx + 26, true);
-		const arc2StartX = buf.getFloat32(idx + 30, true);
-		const arc2StartY = buf.getFloat32(idx + 34, true);
-		const arc2StartZ = buf.getFloat32(idx + 38, true);
-		const startTag1 = buf.getUint32(idx + 42, true);
-		const startTag2 = buf.getUint32(idx + 46, true);
-		const arc1StopX = buf.getFloat32(idx + 50, true);
-		const arc1StopY = buf.getFloat32(idx + 54, true);
-		const arc1StopZ = buf.getFloat32(idx + 58, true);
-		const arc2StopX = buf.getFloat32(idx + 62, true);
-		const arc2StopY = buf.getFloat32(idx + 66, true);
-		const arc2StopZ = buf.getFloat32(idx + 70, true);
-		const stopTag1 = buf.getUint32(idx + 74, true);
-		const stopTag2 = buf.getUint32(idx + 78, true);
+		const id = buf.getUint8(idx);
+		idx++;
 
-		if (
-			locus1Start === 4294967295 &&
-			locus1End === 4294967295 &&
-			locus2Start === 4294967295 &&
-			locus2End === 4294967295 &&
-			score === 65535 &&
-			Number.isNaN(arc1StartX) &&
-			Number.isNaN(arc1StartY) &&
-			Number.isNaN(arc1StartZ) &&
-			Number.isNaN(arc2StartX) &&
-			Number.isNaN(arc2StartY) &&
-			Number.isNaN(arc2StartZ) &&
-			startTag1 === 4294967295 &&
-			startTag2 === 4294967295 &&
-			Number.isNaN(arc1StopX) &&
-			Number.isNaN(arc1StopY) &&
-			Number.isNaN(arc1StopZ) &&
-			Number.isNaN(arc2StopX) &&
-			Number.isNaN(arc2StopY) &&
-			Number.isNaN(arc2StopZ) &&
-			stopTag1 === 4294967295 &&
-			stopTag2 === 4294967295
-		) {
-			idx += 82;
+		if (id === 255) {
 			break;
 		}
 
-		data.arcs.push({
-			id: arcChr,
-			locus1: { start: locus1Start, end: locus1End, chr: `chr${arcChr}` },
-			locus2: { start: locus2Start, end: locus2End, chr: `chr${arcChr}` },
-			score,
-			startPos1: { x: arc1StartX, y: arc1StartY, z: arc1StartZ },
-			startPos2: { x: arc2StartX, y: arc2StartY, z: arc2StartZ },
-			startTag1,
-			startTag2,
-			stopPos1: { x: arc1StopX, y: arc1StopY, z: arc1StopZ },
-			stopPos2: { x: arc2StopX, y: arc2StopY, z: arc2StopZ },
-			stopTag1,
-			stopTag2
-		});
-		idx += 82;
+		const r = buf.getUint8(idx);
+		const g = buf.getUint8(idx + 1);
+		const b = buf.getUint8(idx + 2);
+		idx += 3;
+
+		const track: ArcTrackLite = {
+			color: { r, g, b },
+			id,
+			data: [],
+			max: 0,
+			name: arcNames[arcIdx++]
+		};
+
+		while (true) {
+			const locus1Start = buf.getUint32(idx, true);
+			const locus1End = buf.getUint32(idx + 4, true);
+			const locus2Start = buf.getUint32(idx + 8, true);
+			const locus2End = buf.getUint32(idx + 12, true);
+			const score = buf.getUint16(idx + 16, true);
+			const arc1StartX = buf.getFloat32(idx + 18, true);
+			const arc1StartY = buf.getFloat32(idx + 22, true);
+			const arc1StartZ = buf.getFloat32(idx + 26, true);
+			const arc2StartX = buf.getFloat32(idx + 30, true);
+			const arc2StartY = buf.getFloat32(idx + 34, true);
+			const arc2StartZ = buf.getFloat32(idx + 38, true);
+			const startTag1 = buf.getUint32(idx + 42, true);
+			const startTag2 = buf.getUint32(idx + 46, true);
+			const arc1StopX = buf.getFloat32(idx + 50, true);
+			const arc1StopY = buf.getFloat32(idx + 54, true);
+			const arc1StopZ = buf.getFloat32(idx + 58, true);
+			const arc2StopX = buf.getFloat32(idx + 62, true);
+			const arc2StopY = buf.getFloat32(idx + 66, true);
+			const arc2StopZ = buf.getFloat32(idx + 70, true);
+			const stopTag1 = buf.getUint32(idx + 74, true);
+			const stopTag2 = buf.getUint32(idx + 78, true);
+			idx += 82;
+
+			if (
+				locus1Start === 4294967295 &&
+				locus1End === 4294967295 &&
+				locus2Start === 4294967295 &&
+				locus2End === 4294967295 &&
+				score === 65535 &&
+				Number.isNaN(arc1StartX) &&
+				Number.isNaN(arc1StartY) &&
+				Number.isNaN(arc1StartZ) &&
+				Number.isNaN(arc2StartX) &&
+				Number.isNaN(arc2StartY) &&
+				Number.isNaN(arc2StartZ) &&
+				startTag1 === 4294967295 &&
+				startTag2 === 4294967295 &&
+				Number.isNaN(arc1StopX) &&
+				Number.isNaN(arc1StopY) &&
+				Number.isNaN(arc1StopZ) &&
+				Number.isNaN(arc2StopX) &&
+				Number.isNaN(arc2StopY) &&
+				Number.isNaN(arc2StopZ) &&
+				stopTag1 === 4294967295 &&
+				stopTag2 === 4294967295
+			) {
+				break;
+			}
+
+			if (score > track.max) {
+				track.max = score;
+			}
+			track.data.push({
+				id,
+				locus1: { start: locus1Start, end: locus1End, chr: `chr${arcChr}` },
+				locus2: { start: locus2Start, end: locus2End, chr: `chr${arcChr}` },
+				score,
+				startPos1: { x: arc1StartX, y: arc1StartY, z: arc1StartZ },
+				startPos2: { x: arc2StartX, y: arc2StartY, z: arc2StartZ },
+				startTag1,
+				startTag2,
+				stopPos1: { x: arc1StopX, y: arc1StopY, z: arc1StopZ },
+				stopPos2: { x: arc2StopX, y: arc2StopY, z: arc2StopZ },
+				stopTag1,
+				stopTag2
+			});
+		}
+
+		data.arcs.push(track);
 	}
 
 	const flagChr = buf.getUint8(idx);
 	idx++;
 
-	while (idx < buf.byteLength - 1) {
+	let flagIdx = 0;
+	while (true) {
 		const id = buf.getUint8(idx);
 		idx++;
 
-		while (idx < buf.byteLength - 45) {
+		if (id === 255) {
+			break;
+		}
+
+		const r = buf.getUint8(idx);
+		const g = buf.getUint8(idx + 1);
+		const b = buf.getUint8(idx + 2);
+		idx += 3;
+
+		const track: FlagTrackLite = {
+			color: { r, g, b },
+			id,
+			data: [],
+			max: 0,
+			name: flagNames[flagIdx++]
+		};
+
+		while (true) {
 			const locusStart = buf.getUint32(idx, true);
 			const locusEnd = buf.getUint32(idx + 4, true);
 			const startX = buf.getFloat32(idx + 8, true);
@@ -112,6 +196,7 @@ export function decodeEpiData(buffer: ArrayBuffer): { arcs: RawArcTrackData[]; f
 			const stopTag = buf.getUint32(idx + 36, true);
 			const strand = buf.getUint8(idx + 40);
 			const value = buf.getFloat32(idx + 41, true);
+			idx += 45;
 
 			if (
 				locusStart === 4294967295 &&
@@ -127,11 +212,13 @@ export function decodeEpiData(buffer: ArrayBuffer): { arcs: RawArcTrackData[]; f
 				strand === 255 &&
 				Number.isNaN(value)
 			) {
-				idx += 45;
 				break;
 			}
 
-			data.flags.push({
+			if (value > track.max) {
+				track.max = value;
+			}
+			track.data.push({
 				id,
 				locus: { start: locusStart, end: locusEnd, chr: `chr${flagChr}` },
 				startPos: { x: startX, y: startY, z: startZ },
@@ -141,9 +228,9 @@ export function decodeEpiData(buffer: ArrayBuffer): { arcs: RawArcTrackData[]; f
 				strand: strand === 0 ? '' : 'something fucked up',
 				value
 			});
-
-			idx += 45;
 		}
+
+		data.flags.push(track);
 	}
 
 	return data;

@@ -19,7 +19,7 @@ export default class RadiusSelectorModule {
 
 	/** Caches of results, for faster recollection */
 	private structCache: Record<string, RawStructureCoord[]>;
-	private epiDataCache: Record<string, RawEpiData>;
+	private epiDataCache: Record<string, RenderEpiData>;
 
 	/** The radius to select on */
 	public radius: number;
@@ -164,7 +164,7 @@ export default class RadiusSelectorModule {
 	 * @param params different parameters to use, used for complex sorts (ie. bpsSelector)
 	 * @returns the epiData features found by the selector
 	 */
-	public selectEpiData(params?: RadSelectParams): RawEpiData {
+	public selectEpiData(params?: RadSelectParams): RenderEpiData {
 		// Grab sort parameters, taking params object as priority, but defaulting to use the selector module's parameters
 		const { position, radius } = params || this;
 

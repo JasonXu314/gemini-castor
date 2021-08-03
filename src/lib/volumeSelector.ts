@@ -25,7 +25,7 @@ export default class VolumeSelectorModule {
 
 	/** Caches of results, for faster recollection */
 	private structCache: Record<string, RawStructureCoord[]>;
-	private epiDataCache: Record<string, RawEpiData>;
+	private epiDataCache: Record<string, RenderEpiData>;
 
 	// the boundaries for the sort
 	public minX: number;
@@ -118,7 +118,7 @@ export default class VolumeSelectorModule {
 	 * @param params different parameters to use, used for complex sorts (ie. bpsSelector)
 	 * @returns the epiData features found by the selector
 	 */
-	public selectEpiData(params?: VolSelectParams): RawEpiData {
+	public selectEpiData(params?: VolSelectParams): RenderEpiData {
 		// Grab sort parameters, taking params object as priority, but defaulting to use the selector module's parameters
 		const { maxX, maxY, maxZ, minX, minY, minZ } = params || this;
 

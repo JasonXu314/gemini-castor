@@ -151,6 +151,11 @@ interface RawFlagTrackData {
 }
 
 interface RawEpiData {
+	arcs: ArcTrackLite[];
+	flags: FlagTrackLite[];
+}
+
+interface RenderEpiData {
 	arcs: RawArcTrackData[];
 	flags: RawFlagTrackData[];
 }
@@ -193,8 +198,8 @@ interface ViewRegion {
 interface RawGameMetadata {
 	structure: RawStructureCoord[];
 	epiData: {
-		arcs: RawArcTrackData[];
-		flags: RawFlagTrackData[];
+		arcs: ArcTrackLite[];
+		flags: FlagTrackLite[];
 	};
 	refGenes: RawRefGene[];
 	viewRegion: ViewRegion;
@@ -232,12 +237,16 @@ interface FlagTrackLite {
 	data: RawFlagTrackData[];
 	max: number;
 	color: RawColor3;
+	id: number;
+	name: string;
 }
 
 interface ArcTrackLite {
 	data: RawArcTrackData[];
 	max: number;
 	color: RawColor3;
+	id: number;
+	name: string;
 }
 
 interface RawAnnotation {

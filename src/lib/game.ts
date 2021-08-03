@@ -48,7 +48,7 @@ export default class GameLite {
 
 	// Caches
 	private structCache: Record<string, RawStructureCoord[]>;
-	private epiDataCache: Record<string, RawEpiData>;
+	private epiDataCache: Record<string, RenderEpiData>;
 
 	// To track camera movement
 	private prevCamPos: Vector3;
@@ -353,7 +353,7 @@ export default class GameLite {
 					: epiData1.flags.length > epiData2.flags.length
 					? epiData1.flags.filter((flag) => epiData2.flags.includes(flag))
 					: epiData2.flags.filter((flag) => epiData1.flags.includes(flag));
-			const finalEpi: RawEpiData = {
+			const finalEpi: RenderEpiData = {
 				arcs: finalArcs,
 				flags: finalFlags
 			};
@@ -408,7 +408,7 @@ export default class GameLite {
 					? this.epiDataCache[serializedParams].flags
 					: shortFlags.filter((flag) => otherFlags.every((arr) => arr.includes(flag)));
 
-			const finalEpi: RawEpiData = {
+			const finalEpi: RenderEpiData = {
 				arcs: finalArcs,
 				flags: finalFlags
 			};
