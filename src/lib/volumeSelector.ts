@@ -106,7 +106,9 @@ export default class VolumeSelectorModule {
 			return this.structCache[keyStr];
 		}
 
-		const results = this.structure.structureBush.search({ maxX, maxY, maxZ, minX, minY, minZ }).map((point) => point.raw);
+		const results = this.structure.structureBush
+			.search({ maxX, maxY, maxZ, minX, minY, minZ })
+			.map((point) => point.raw);
 
 		this.structCache[keyStr] = results;
 
@@ -198,7 +200,7 @@ export default class VolumeSelectorModule {
 			this.placingSelector = false;
 
 			// Set walls' colors to green to indicate to user the sort is ready
-			this.wallMat.specularColor = new Color3(0, 1, 0);
+			this.wallMat.diffuseColor = new Color3(0, 1, 0);
 		}
 	}
 

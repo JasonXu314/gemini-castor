@@ -25,11 +25,15 @@ type ListenerMap<T extends Record<string, any>> = {
 };
 
 type EpiDataFeature = SelectedFlag | SelectedArc;
+type RawHighlight = RadiusHighlight | VolumeHighlight;
 
 type SocketReceiveMsgs = {
 	HIST_ADD: { type: 'HIST_ADD'; newSort: Sort };
 	HIST_DEL: { type: 'HIST_DEL'; id: string };
 	HIST_EDIT: { type: 'HIST_EDIT'; id: string; name: string };
+	HIGHLIGHT_ADD: { type: 'HIGHLIGHT_ADD'; newHighlight: RawHighlight };
+	HIGHLIGHT_DEL: { type: 'HIGHLIGHT_DEL'; id: string };
+	HIGHLIGHT_EDIT: { type: 'HIGHLIGHT_EDIT'; id: string; name: string };
 	VIEW_ADD: { type: 'VIEW_ADD'; newView: View };
 	VIEW_DEL: { type: 'VIEW_DEL'; id: string };
 	VIEW_EDIT: { type: 'VIEW_EDIT'; id: string; name: string };
@@ -88,6 +92,7 @@ interface Model {
 	modelData: ModelData;
 	sortHist: Sort[];
 	annotations: RawAnnotation[];
+	highlights: RawHighlight[];
 	views: View[];
 	live: boolean;
 	session: null | LiveSessionData;
@@ -225,12 +230,10 @@ interface SBushData extends BaseBushData {
 
 interface FBushData extends BaseBushData {
 	raw: RawFlagTrackData;
-	annotation: string | null;
 }
 
 interface ABushData extends BaseBushData {
 	raw: RawArcTrackData;
-	annotation: string | null;
 }
 
 interface FlagTrackLite {
@@ -307,4 +310,18 @@ interface View {
 	name: string;
 	pos: RawVector3;
 	rot: RawVector3;
+}
+
+interface RadiusHighlight {
+	id: string;
+	name: string;
+	params: RadSelectParams;
+	type: 'radius';
+}
+
+interface VolumeHighlight {
+	id: string;
+	name: string;
+	params: VolSelectParams;
+	type: 'volume';
 }

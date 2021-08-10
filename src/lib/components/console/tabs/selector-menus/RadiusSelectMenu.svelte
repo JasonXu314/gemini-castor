@@ -159,7 +159,7 @@
 		>{initPos || settingParams ? 'Double-click anywhere to set selector center, or click here to cancel' : 'Place!'}</Button
 	>
 	<Button type={paramsSet ? 'cancel' : 'action'} on:click={paramsSet ? reset : finalize}>{paramsSet ? 'Reset' : 'Set!'}</Button>
-	<Button type={'action'} disabled={initPos} on:click={search}>Search!</Button>
+	<Button type="action" disabled={initPos} on:click={search}>Search!</Button>
 </div>
 
 <style>

@@ -5,6 +5,7 @@
 	import Button from '../Button.svelte';
 	import GeneralInfo from './tabs/GeneralInfo.svelte';
 	import LiveSession from './tabs/LiveSession.svelte';
+	import RegionHighlights from './tabs/RegionHighlights.svelte';
 	import Selectors from './tabs/Selectors.svelte';
 	import SortHistory from './tabs/SortHistory.svelte';
 	import ViewHistory from './tabs/ViewHistory.svelte';
@@ -35,16 +36,18 @@
 		<Button type="tab" on:click={() => (collapsed = !collapsed)}>Collapse</Button>
 		<Button type="tab" on:click={() => (tabNum = 0)}>General Info</Button>
 		<Button type="tab" on:click={() => (tabNum = 1)}>Selectors</Button>
-		<Button type="tab" on:click={() => (tabNum = 2)}>History</Button>
-		<Button type="tab" on:click={() => (tabNum = 3)}>Views</Button>
-		<Button type="tab" on:click={() => (tabNum = 4)}>Live Session</Button>
+		<Button type="tab" on:click={() => (tabNum = 2)}>Highlights</Button>
+		<Button type="tab" on:click={() => (tabNum = 3)}>History</Button>
+		<Button type="tab" on:click={() => (tabNum = 4)}>Views</Button>
+		<Button type="tab" on:click={() => (tabNum = 5)}>Live Session</Button>
 	</div>
 	<div class="body" class:hidden={collapsed}>
 		<GeneralInfo closed={tabNum !== 0} {game} />
 		<Selectors closed={tabNum !== 1} {game} />
-		<SortHistory closed={tabNum !== 2} {recallSort} {game} />
-		<ViewHistory closed={tabNum !== 3} {recallView} {game} />
-		<LiveSession closed={tabNum !== 4} {game} {socket} {socketId} {liveSession} />
+		<RegionHighlights closed={tabNum !== 2} {game} />
+		<SortHistory closed={tabNum !== 3} {recallSort} {game} />
+		<ViewHistory closed={tabNum !== 4} {recallView} {game} />
+		<LiveSession closed={tabNum !== 5} {game} {socket} {socketId} {liveSession} />
 	</div>
 </div>
 

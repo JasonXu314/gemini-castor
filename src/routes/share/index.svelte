@@ -3,12 +3,18 @@
 	import axios from 'axios';
 	import { onMount } from 'svelte';
 
-	let models: Model[] | null = null;
+	let models: Model[] | null = null,
+		err: string | null = null;
 
 	onMount(() => {
-		axios.get<Model[]>(`${BACKEND_URL}/models`).then((res) => {
-			models = res.data;
-		});
+		axios
+			.get<Model[]>(`${BACKEND_URL}/models`)
+			.then((res) => {
+				models = res.data;
+			})
+			.catch(() => {
+				err = 'Network Error';
+			});
 	});
 </script>
 
@@ -16,6 +22,8 @@
 	<h4 class="title">Gallery</h4>
 	{#if !models}
 		<div>Loading...</div>
+	{:else if err}
+		<div>{err}</div>
 	{:else}
 		<ul class="gallery">
 			{#each models as model}

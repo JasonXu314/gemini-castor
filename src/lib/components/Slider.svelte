@@ -3,7 +3,7 @@
 	export let label: string;
 	export let min: number;
 	export let max: number;
-	export let disabled: boolean;
+	export let disabled: boolean = false;
 	export let softMin: number = min;
 	export let softMax: number = max;
 	export let dark: boolean = false;

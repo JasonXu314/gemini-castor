@@ -15,9 +15,20 @@ import {
 import { v4 as uuid } from 'uuid';
 import BasePairSelectorModule from './bps';
 import EpiDataModule from './epiData';
+import GUIModule from './gui';
+import HighlightsModule from './highlights';
 import RadiusSelectorModule from './radiusSelector';
 import StructureModule from './structure';
-import { compareVectors, EventSrc, findShortest, Logger, modColor, serializeParams2, serializeParams3, strictCompareVectors } from './utils/utils';
+import {
+	compareVectors,
+	EventSrc,
+	findShortest,
+	Logger,
+	modColor,
+	serializeParams2,
+	serializeParams3,
+	strictCompareVectors
+} from './utils/utils';
 import VolumeSelectorModule from './volumeSelector';
 
 interface GameLiteEvents {
@@ -27,9 +38,11 @@ interface GameLiteEvents {
 	CANCEL_SET_ANN_NAME: undefined;
 	SET_ANN_NAME: string;
 	SELECT_FEATURE: EpiDataFeature;
+	SELECT_HIGHLIGHT: RawHighlight;
 	DESELECT_FEATURE: undefined;
 	RECALL_SORT: Sort;
 	CAM_CHANGE: undefined;
+	INIT: undefined;
 }
 
 const optimizerOptions = new SceneOptimizerOptions();
@@ -61,11 +74,13 @@ export default class GameLite {
 	public sortsActive: boolean;
 
 	// Modules
+	public gui: GUIModule;
 	public structure: StructureModule;
 	public epiData: EpiDataModule;
 	public radSelect: RadiusSelectorModule;
 	public volSelect: VolumeSelectorModule;
 	public bpsSelect: BasePairSelectorModule;
+	public highlights: HighlightsModule;
 
 	// Utilities
 	private renderStructure: Promise<void> | null;
@@ -85,7 +100,13 @@ export default class GameLite {
 	 * @param canvas the canvas to render on
 	 * @param rawData raw data for loading saved model
 	 */
-	constructor(public canvas: HTMLCanvasElement, public rawData: RawGameMetadata, initSortId: number, annotations: RawAnnotation[]) {
+	constructor(
+		public canvas: HTMLCanvasElement,
+		public rawData: RawGameMetadata,
+		initSortId: number,
+		annotations: RawAnnotation[],
+		highlights: RawHighlight[]
+	) {
 		// Initialize utility stuff
 		this.logger = new Logger('Main');
 		this.engine = new Engine(canvas.getContext('webgl'));
@@ -108,7 +129,9 @@ export default class GameLite {
 			'SELECT_FEATURE',
 			'DESELECT_FEATURE',
 			'RECALL_SORT',
-			'CAM_CHANGE'
+			'CAM_CHANGE',
+			'SELECT_HIGHLIGHT',
+			'INIT'
 		]);
 
 		// Set up scene optimizers
@@ -173,10 +196,13 @@ export default class GameLite {
 		this.zAxis.isPickable = false;
 
 		// Initializing modules & generating data
+		this.gui = new GUIModule(this.scene);
+		this.highlights = new HighlightsModule(this.gui, canvas, this.scene, this);
+		this.highlights.loadHighlights(highlights);
 		this.structure = new StructureModule(rawData.structure, this.scene);
 		this.structure.generateStructData();
 		this.renderStructure = this.structure.renderStruct(this.structure.defaultStructureData);
-		this.epiData = new EpiDataModule(rawData.epiData, this.structure, this.scene, rawData.id);
+		this.epiData = new EpiDataModule(rawData.epiData, this.structure, this.gui, this.scene, rawData.id);
 		this.epiData.generateEpiData();
 		this.epiData.renderFlags(
 			Object.values(this.epiData.flagTracks).reduce((arr, track) => [...arr, ...track.data], []),
@@ -187,13 +213,26 @@ export default class GameLite {
 
 		// Loading in existing annotations, but only after things are rendered for the first time
 		setTimeout(() => {
-			this.epiData.loadAnnotations(annotations);
+			this.gui.loadAnnotations(annotations);
 		}, 0);
 
 		// Initializing sort modules
-		this.radSelect = new RadiusSelectorModule(canvas, this.scene, this.structure, this.epiData, rawData.viewRegion, this);
+		this.radSelect = new RadiusSelectorModule(
+			canvas,
+			this.scene,
+			this.structure,
+			this.epiData,
+			rawData.viewRegion,
+			this
+		);
 		this.volSelect = new VolumeSelectorModule(this.scene, this.structure, this.epiData);
-		this.bpsSelect = new BasePairSelectorModule(this.scene, this.structure, this.epiData, this.radSelect, rawData.viewRegion);
+		this.bpsSelect = new BasePairSelectorModule(
+			this.scene,
+			this.structure,
+			this.epiData,
+			this.radSelect,
+			rawData.viewRegion
+		);
 
 		// Add listeners for click detection
 		this.scene.onPointerDown = (evt) => {
@@ -203,7 +242,7 @@ export default class GameLite {
 					const downMesh = this.hoverMesh;
 
 					this.scene.onPointerMove = () => {
-						if (!this.hoverMesh) {
+						if (!this.hoverMesh || this.hoverMesh !== downMesh) {
 							// If the cursor ever leaves the mesh that was moused down on, we can ignore the sequence, as it should not select a mesh
 							this.scene.onPointerUp = undefined;
 							this.scene.onPointerMove = undefined;
@@ -211,20 +250,36 @@ export default class GameLite {
 					};
 					this.scene.onPointerUp = (evt) => {
 						// if left button click and the mouse is still over the same mesh, AND the mesh is not already selected
-						if (evt.button === 0 && this.hoverMesh && this.hoverMesh === downMesh && this.selectedMesh !== downMesh) {
+						if (
+							evt.button === 0 &&
+							this.hoverMesh &&
+							this.hoverMesh === downMesh &&
+							this.selectedMesh !== downMesh
+						) {
 							if (this.selectedMesh) {
 								// if a mesh is already selected, fix the color
-								(this.selectedMesh.material as StandardMaterial).diffuseColor = this.selectedOriginalColor;
+								(this.selectedMesh.material as StandardMaterial).diffuseColor =
+									this.selectedOriginalColor;
 							}
 							this.selectedMesh = downMesh;
 							this.selectedOriginalColor = this.originalColor;
 
 							// tell the console that the user clicked on a mesh
-							// @ts-ignore no clue why ts fucks up here, but it should work nonetheless
-							this.events.dispatch('SELECT_FEATURE', this.epiData.getInfo(this.selectedMesh));
+							if (this.selectedMesh.name.startsWith('highlight')) {
+								this.events.dispatch(
+									'SELECT_HIGHLIGHT',
+									// @ts-ignore no clue why ts fucks up here, but it should work nonetheless
+									this.highlights.highlights.get(this.selectedMesh.name.split('-').slice(1).join('-'))!
+								);
+							} else {
+								// @ts-ignore no clue why ts fucks up here, but it should work nonetheless
+								this.events.dispatch('SELECT_FEATURE', this.epiData.getInfo(this.selectedMesh));
+							}
 						}
 						// if right button click and the mouse is still over the same mesh
-						if (evt.button === 2 && this.hoverMesh === downMesh && this.selectedMesh) {
+						if (evt.button === 2 && this.hoverMesh && this.hoverMesh === downMesh && this.selectedMesh) {
+							this.hoverMesh = this.selectedMesh;
+							this.originalColor = this.selectedOriginalColor;
 							(this.selectedMesh.material as StandardMaterial).diffuseColor = this.selectedOriginalColor;
 							this.selectedMesh = null;
 							this.selectedOriginalColor = null;
@@ -246,7 +301,9 @@ export default class GameLite {
 					};
 					this.scene.onPointerUp = (evt) => {
 						// if the user has right clicked on empty space
-						if (evt.button === 2 && !this.hoverMesh) {
+						if (evt.button === 2 && !this.hoverMesh && this.selectedMesh) {
+							this.hoverMesh = this.selectedMesh;
+							this.originalColor = this.selectedOriginalColor;
 							(this.selectedMesh.material as StandardMaterial).diffuseColor = this.selectedOriginalColor;
 							this.selectedMesh = null;
 							this.selectedOriginalColor = null;
@@ -276,6 +333,8 @@ export default class GameLite {
 
 		// For debugging purposes (probably should be commented for production)
 		(window as any).game = this;
+
+		this.events.dispatch('INIT');
 
 		this.logger.log('Initialized');
 	}
@@ -500,8 +559,15 @@ export default class GameLite {
 					this.radSelect.updateGuide();
 				}
 
+				if (this.highlights.radiusGuide && this.highlights.initPos) {
+					this.highlights.updateRadiusGuide();
+				}
+
 				// If the camera changed a significant amount, tell the console that (used for live session camera syncing)
-				if (!compareVectors(this.camera.position, this.prevCamPos) || !strictCompareVectors(this.camera.rotation, this.prevCamRot)) {
+				if (
+					!compareVectors(this.camera.position, this.prevCamPos) ||
+					!strictCompareVectors(this.camera.rotation, this.prevCamRot)
+				) {
 					this.events.dispatch('CAM_CHANGE');
 					this.prevCamPos = this.camera.position.clone();
 					this.prevCamRot = this.camera.rotation.clone();
@@ -568,15 +634,31 @@ export default class GameLite {
 			this.selectedMesh = mesh;
 			this.selectedOriginalColor = this.originalColor;
 
-			// @ts-ignore no clue why ts fucks up here, but it should work nonetheless
-			this.events.dispatch('SELECT_FEATURE', this.epiData.getInfo(this.selectedMesh));
+			if (this.selectedMesh.name.startsWith('highlight')) {
+				this.events.dispatch(
+					'SELECT_HIGHLIGHT',
+					// @ts-ignore no clue why ts fucks up here, but it should work nonetheless
+					this.highlights.highlights.get(this.selectedMesh.name.split('-').slice(1).join('-'))!
+				);
+			} else {
+				// @ts-ignore no clue why ts fucks up here, but it should work nonetheless
+				this.events.dispatch('SELECT_FEATURE', this.epiData.getInfo(this.selectedMesh));
+			}
 		} else {
 			this.selectedMesh = mesh;
 			this.selectedOriginalColor = (mesh.material as StandardMaterial).diffuseColor;
 			(mesh.material as StandardMaterial).diffuseColor = modColor(this.selectedOriginalColor);
 
-			// @ts-ignore no clue why ts fucks up here, but it should work nonetheless
-			this.events.dispatch('SELECT_FEATURE', this.epiData.getInfo(this.selectedMesh));
+			if (this.selectedMesh.name.startsWith('highlight')) {
+				this.events.dispatch(
+					'SELECT_HIGHLIGHT',
+					// @ts-ignore no clue why ts fucks up here, but it should work nonetheless
+					this.highlights.highlights.get(this.selectedMesh.name.split('-').slice(1).join('-'))!
+				);
+			} else {
+				// @ts-ignore no clue why ts fucks up here, but it should work nonetheless
+				this.events.dispatch('SELECT_FEATURE', this.epiData.getInfo(this.selectedMesh));
+			}
 		}
 	}
 
@@ -609,12 +691,13 @@ export default class GameLite {
 	/** Renders 1 frame of the game, to generate an image for the previews in the gallery */
 	public async preview(): Promise<void> {
 		// wait for the structure to finish rendering (async because points cloud system)
-		await this.renderStructure;
-
-		// wait 1 frame for stuff to render, to allow annotations to render
-		setTimeout(() => {
-			this.scene.render();
-		}, 0);
+		await this.renderStructure.then(() => {
+			// wait 1 frame for stuff to render, to allow annotations to render
+			setTimeout(() => {
+				this.scene.render();
+				this.logger.log('Rendering');
+			}, 500);
+		});
 	}
 
 	/**

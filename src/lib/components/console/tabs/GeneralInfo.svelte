@@ -1,30 +1,95 @@
 <script lang="ts">
 	import type GameLite from '$lib/game';
+	import { Vector3 } from '$lib/utils/babylon';
+	import { BACKEND_URL } from '$lib/utils/constants';
+	import axios from 'axios';
 	import Button from '../../Button.svelte';
+
 
 	export let game: GameLite;
 	export let closed: boolean;
 
-	let selectedFeature: EpiDataFeature | null = null;
-	let hasAnnotation: boolean = selectedFeature === null ? false : game.epiData.hasAnnotation(selectedFeature.mesh);
+	let selectedFeature: EpiDataFeature | null = null,
+		selectedHighlight: RawHighlight | null = null,
+		tempName: string | null = null;
+	let hasAnnotation: boolean =
+		selectedFeature === null && selectedHighlight === null
+			? false
+			: game.gui.hasAnnotation(
+					selectedFeature ? selectedFeature.mesh : game.scene.getMeshByName(`highlight-${selectedHighlight.id}`)
+			  );
 
-	game.events.on('SELECT_FEATURE', (feature: EpiDataFeature) => (selectedFeature = feature));
-	game.events.on('DESELECT_FEATURE', () => (selectedFeature = null));
+	game.events.on('SELECT_FEATURE', (feature: EpiDataFeature) => {
+		selectedFeature = feature;
+		if (selectedHighlight) {
+			selectedHighlight = null;
+		}
+	});
+	game.events.on('SELECT_HIGHLIGHT', (highlight: RawHighlight) => {
+		selectedHighlight = highlight;
+		tempName = highlight.name;
+		if (selectedFeature) {
+			selectedFeature = null;
+		}
+	});
+	game.events.on('DESELECT_FEATURE', () => {
+		selectedFeature = null;
+		selectedHighlight = null;
+		tempName = null;
+	});
 
-	$: hasAnnotation = selectedFeature === null ? false : game.epiData.hasAnnotation(selectedFeature.mesh);
+	$: hasAnnotation =
+		selectedFeature === null && selectedHighlight === null
+			? false
+			: game.gui.hasAnnotation(
+					selectedFeature ? selectedFeature.mesh : game.scene.getMeshByName(`highlight-${selectedHighlight.id}`)
+			  );
 
-	game.epiData.events.on('CREATED_ANNOTATION', (mesh: Mesh) => {
+	game.gui.events.on('CREATED_ANNOTATION', (mesh: Mesh) => {
 		if (selectedFeature && mesh === selectedFeature.mesh) {
+			hasAnnotation = true;
+		} else if (selectedHighlight && mesh.name === `highlight-${selectedHighlight.id}`) {
 			hasAnnotation = true;
 		}
 	});
-	game.epiData.events.on('DELETED_ANNOTATION', (mesh: Mesh) => {
+
+	game.gui.events.on('DELETED_ANNOTATION', (mesh: Mesh) => {
 		if (selectedFeature && mesh === selectedFeature.mesh) {
+			hasAnnotation = false;
+		} else if (selectedHighlight && mesh.name === `highlight-${selectedHighlight.id}`) {
 			hasAnnotation = false;
 		}
 	});
 
-	(window as any).getSelectedMesh = () => selectedFeature.mesh;
+	game.highlights.events.on('DELETED_HIGHLIGHT', (highlight: RawHighlight) => {
+		if (selectedHighlight && highlight.id === selectedHighlight.id) {
+			selectedHighlight = null;
+			tempName = null;
+		}
+	});
+
+	game.highlights.events.on('EDITED_HIGHLIGHT', ({ id, name }) => {
+		if (selectedHighlight && id === selectedHighlight.id) {
+			selectedHighlight = { ...selectedHighlight, name };
+			tempName = name;
+		}
+	});
+
+	function viewRad(): void {
+		const params = selectedHighlight.params as RadSelectParams;
+		const {
+			position: { x, y, z },
+			radius
+		} = params;
+		const meshPos = new Vector3(x, y, z);
+		const camToPos = game.camera.position.subtract(meshPos);
+		game.camera.setTarget(meshPos);
+		game.camera.position = game.camera.position.subtract(
+			camToPos.scale((camToPos.length() - (radius + 2500)) / camToPos.length())
+		);
+	}
+
+	(window as any).getSelected = () => selectedFeature || selectedHighlight;
 </script>
 
 <div class="console" class:hidden={closed}>
@@ -56,7 +121,9 @@
 							const rad = boundingInfo.radius;
 							const camToPos = game.camera.position.subtract(meshPos);
 							game.camera.setTarget(meshPos);
-							game.camera.position = game.camera.position.subtract(camToPos.scale((camToPos.length() - (rad + 2500)) / camToPos.length()));
+							game.camera.position = game.camera.position.subtract(
+								camToPos.scale((camToPos.length() - (rad + 2500)) / camToPos.length())
+							);
 						}}>View</Button
 					>
 					<Button
@@ -108,14 +175,16 @@
 							const rad = boundingInfo.radius;
 							const camToPos = game.camera.position.subtract(meshPos);
 							game.camera.setTarget(meshPos);
-							game.camera.position = game.camera.position.subtract(camToPos.scale((camToPos.length() - (rad + 2500)) / camToPos.length()));
+							game.camera.position = game.camera.position.subtract(
+								camToPos.scale((camToPos.length() - (rad + 2500)) / camToPos.length())
+							);
 						}}>View</Button
 					>
 					<Button
 						type="action"
 						on:click={() => {
 							if (!hasAnnotation) {
-								game.getAnnotationName(selectedFeature.mesh.name)
+								game.getAnnotationName(selectedHighlight.name)
 									.then((annotation) => {
 										game.epiData.addAnnotation(selectedFeature.mesh, annotation);
 										hasAnnotation = true;
@@ -126,6 +195,145 @@
 								hasAnnotation = false;
 							}
 						}}>{hasAnnotation ? 'Delete Annotation' : 'Add Annotation'}</Button
+					>
+				</div>
+			</div>
+		{/if}
+	{:else if selectedHighlight}
+		{#if selectedHighlight.type === 'radius'}
+			<div class="info-container arc">
+				<div class="left">
+					<div>
+						<input
+							type="text"
+							class="subtle-input"
+							bind:value={tempName}
+							on:blur={() => {
+								if (tempName !== selectedHighlight.name) {
+									axios.patch(`${BACKEND_URL}/highlights`, {
+										id: game.rawData.id,
+										_id: selectedHighlight.id,
+										name: tempName
+									});
+								}
+							}}
+						/>
+					</div>
+					<div class="middle">
+						<h4 class="title">Position</h4>
+						<div class="info">
+							({selectedHighlight.params.position.x.toFixed(2)}, {selectedHighlight.params.position.y.toFixed(
+								2
+							)}, {selectedHighlight.params.position.z.toFixed(2)})
+						</div>
+						<h4 class="title">Radius</h4>
+						<div class="info">{selectedHighlight.params.radius}</div>
+					</div>
+				</div>
+				<div class="right">
+					<Button type="action" on:click={viewRad}>View</Button>
+					<Button
+						type={hasAnnotation ? 'cancel' : 'action'}
+						on:click={() => {
+							const mesh = game.scene.getMeshByName(`highlight-${selectedHighlight.id}`);
+							if (!hasAnnotation) {
+								game.getAnnotationName(selectedHighlight.name)
+									.then((annotation) => {
+										game.gui.makeAnnotation(mesh, annotation);
+										axios.post(`${BACKEND_URL}/annotations`, {
+											id: game.rawData.id,
+											annotation: { mesh: mesh.name, text: annotation }
+										});
+										hasAnnotation = true;
+									})
+									.catch(() => {});
+							} else {
+								game.gui.removeAnnotationFromMesh(mesh);
+								axios.delete(`${BACKEND_URL}/annotations`, {
+									data: { id: game.rawData.id, name: mesh.name }
+								});
+								hasAnnotation = false;
+							}
+						}}>{hasAnnotation ? 'Delete Annotation' : 'Add Annotation'}</Button
+					>
+					<Button
+						type="cancel"
+						on:click={() => {
+							axios.delete(`${BACKEND_URL}/highlights`, {
+								data: { id: game.rawData.id, _id: selectedHighlight.id }
+							});
+							game.highlights.deleteHighlight(selectedHighlight.id);
+						}}>Delete Highlight</Button
+					>
+				</div>
+			</div>
+		{:else}
+			<div class="info-container arc">
+				<div class="left">
+					<div>
+						<input
+							type="text"
+							class="subtle-input"
+							bind:value={tempName}
+							on:blur={() => {
+								if (tempName !== selectedHighlight.name) {
+									axios.patch(`${BACKEND_URL}/highlights`, {
+										id: game.rawData.id,
+										_id: selectedHighlight.id,
+										name: tempName
+									});
+								}
+							}}
+						/>
+					</div>
+					<div class="middle">
+						<h4 class="title">Position</h4>
+						<div class="info">
+							<div
+								>Min X: {selectedHighlight.params.minX} Min Y: {selectedHighlight.params.minY} Min Z: {selectedHighlight
+									.params.minZ}</div
+							>
+							<div
+								>Max X: {selectedHighlight.params.maxX} Max Y: {selectedHighlight.params.maxY} Max Z: {selectedHighlight
+									.params.maxZ}</div
+							>
+						</div>
+					</div>
+				</div>
+				<div class="right">
+					<Button type="action" on:click={viewRad}>View</Button>
+					<Button
+						type={hasAnnotation ? 'cancel' : 'action'}
+						on:click={() => {
+							const mesh = game.scene.getMeshByName(`highlight-${selectedHighlight.id}`);
+							if (!hasAnnotation) {
+								game.getAnnotationName(selectedHighlight.name)
+									.then((annotation) => {
+										game.gui.makeAnnotation(mesh, annotation);
+										axios.post(`${BACKEND_URL}/annotations`, {
+											id: game.rawData.id,
+											annotation: { mesh: mesh.name, text: annotation }
+										});
+										hasAnnotation = true;
+									})
+									.catch(() => {});
+							} else {
+								game.gui.removeAnnotationFromMesh(mesh);
+								axios.delete(`${BACKEND_URL}/annotations`, {
+									data: { id: game.rawData.id, name: mesh.name }
+								});
+								hasAnnotation = false;
+							}
+						}}>{hasAnnotation ? 'Delete Annotation' : 'Add Annotation'}</Button
+					>
+					<Button
+						type="cancel"
+						on:click={() => {
+							axios.delete(`${BACKEND_URL}/highlights`, {
+								data: { id: game.rawData.id, _id: selectedHighlight.id }
+							});
+							game.highlights.deleteHighlight(selectedHighlight.id);
+						}}>Delete Highlight</Button
 					>
 				</div>
 			</div>
@@ -190,5 +398,12 @@
 
 	.bottom .info {
 		margin-left: 0.5em;
+	}
+
+	.subtle-input {
+		border: 0;
+		border-bottom: 1px solid #cccccc;
+		background: rgba(0, 0, 0, 0);
+		color: white;
 	}
 </style>

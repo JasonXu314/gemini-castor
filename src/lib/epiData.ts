@@ -1,16 +1,6 @@
-import {
-	AbstractMesh,
-	AdvancedDynamicTexture,
-	Color3,
-	Mesh,
-	MeshBuilder,
-	Rectangle,
-	StandardMaterial,
-	TextBlock,
-	Vector3,
-	VertexData
-} from '$lib/utils/babylon';
+import { AbstractMesh, Color3, Mesh, MeshBuilder, StandardMaterial, Vector3, VertexData } from '$lib/utils/babylon';
 import axios from 'axios';
+import type GUIModule from './gui';
 import type StructureModule from './structure';
 import { BACKEND_URL } from './utils/constants';
 import OurBush3D from './utils/ourBush';
@@ -19,8 +9,6 @@ import { EventSrc, Logger } from './utils/utils';
 interface EpiDataEvents {
 	ARC_SHOW: undefined;
 	FLAG_SHOW: undefined;
-	CREATED_ANNOTATION: AbstractMesh;
-	DELETED_ANNOTATION: AbstractMesh;
 }
 
 /** Class to handle all operations regarding epiData data and rendering */
@@ -29,8 +17,6 @@ export default class EpiDataModule {
 	private logger: Logger;
 
 	// GUI stuff
-	private gui: AdvancedDynamicTexture;
-	private unloadedAnnotations: RawAnnotation[];
 	public annotationsShown: boolean;
 
 	// Flag Data
@@ -41,8 +27,7 @@ export default class EpiDataModule {
 	public flagTracks: Record<number, FlagTrackLite>;
 	public flagsShown: boolean;
 	public currentRenderedFlagData: RawFlagTrackData[] | null;
-	public annotatedFlags: FBushData[];
-	public flagAnnotations: Map<FBushData, Rectangle>;
+	public annotatedFlagMeshes: Map<FBushData, AbstractMesh>;
 
 	// Arc Data
 	private arcMeshes: Record<number, Map<RawArcTrackData, RenderedArc>> | null;
@@ -52,8 +37,7 @@ export default class EpiDataModule {
 	public arcTracks: Record<number, ArcTrackLite>;
 	public arcsShown: boolean;
 	public currentRenderedArcData: RawArcTrackData[] | null;
-	public annotatedArcs: ABushData[];
-	public arcAnnotations: Map<ABushData, Rectangle>;
+	public annotatedArcMeshes: Map<ABushData, AbstractMesh[]>;
 
 	public events: EventSrc<EpiDataEvents>;
 
@@ -63,7 +47,13 @@ export default class EpiDataModule {
 	 * @param structure the structure module to be used
 	 * @param scene the scene to render in
 	 */
-	constructor(public data: RawEpiData, private structure: StructureModule, private scene: Scene, private modelId: string) {
+	constructor(
+		public data: RawEpiData,
+		private structure: StructureModule,
+		private gui: GUIModule,
+		private scene: Scene,
+		private modelId: string
+	) {
 		this.logger = new Logger('EpiData');
 
 		this.flagMeshes = null;
@@ -73,8 +63,7 @@ export default class EpiDataModule {
 		this.flagTracks = {};
 		this.flagsShown = true;
 		this.currentRenderedFlagData = null;
-		this.annotatedFlags = [];
-		this.flagAnnotations = new Map();
+		this.annotatedFlagMeshes = new Map();
 
 		this.arcMeshes = null;
 		this.arcIndexMap = new Map();
@@ -83,14 +72,11 @@ export default class EpiDataModule {
 		this.arcTracks = {};
 		this.arcsShown = true;
 		this.currentRenderedArcData = null;
-		this.annotatedArcs = [];
-		this.arcAnnotations = new Map();
+		this.annotatedArcMeshes = new Map();
 
 		this.events = new EventSrc(['ARC_SHOW', 'FLAG_SHOW']);
 
-		this.gui = AdvancedDynamicTexture.CreateFullscreenUI('annotation-ui');
 		this.annotationsShown = true;
-		this.unloadedAnnotations = [];
 
 		this.logger.log('Initialized');
 	}
@@ -113,8 +99,7 @@ export default class EpiDataModule {
 					minY: Math.min(sy, ey),
 					maxZ: Math.max(sz, ez),
 					minZ: Math.min(sz, ez),
-					raw: trackData,
-					annotation: null
+					raw: trackData
 				});
 				this.flagIndexMap.set(trackData, flagIndex++);
 			});
@@ -136,8 +121,7 @@ export default class EpiDataModule {
 					minY: Math.min(s1y, e1y, s2y, e2y),
 					maxZ: Math.max(s1z, e1z, s2z, e2z),
 					minZ: Math.min(s1z, e1z, s2z, e2z),
-					raw: trackData,
-					annotation: null
+					raw: trackData
 				});
 				this.arcIndexMap.set(trackData, arcIndex++);
 			});
@@ -161,18 +145,22 @@ export default class EpiDataModule {
 		const fitFlags = flags.filter((flag) => flag.value >= (minVal / 100) * this.flagTracks[flag.id].max);
 
 		// Flags whose meshes need to be generated
-		const newFlags = this.flagMeshes ? fitFlags.filter((flag) => flag.id in this.flagMeshes && !this.flagMeshes[flag.id].has(flag)) : fitFlags;
+		const newFlags = this.flagMeshes
+			? fitFlags.filter((flag) => flag.id in this.flagMeshes && !this.flagMeshes[flag.id].has(flag))
+			: fitFlags;
 
 		if (this.flagMeshes) {
 			// Enable the flags that were previously disabled that are supposed to be rendered in this call
 			fitFlags.forEach((flag) => {
-				if (flag.id in this.flagMeshes && this.flagMeshes[flag.id].has(flag) && !this.flagMeshes[flag.id].get(flag).isEnabled()) {
+				if (
+					flag.id in this.flagMeshes &&
+					this.flagMeshes[flag.id].has(flag) &&
+					!this.flagMeshes[flag.id].get(flag).isEnabled()
+				) {
 					const mesh = this.flagMeshes[flag.id].get(flag);
 					mesh.setEnabled(true);
-					const bushEntry = this.getBushEntry(mesh) as FBushData;
-					if (bushEntry.annotation) {
-						this.flagAnnotations.get(bushEntry).isVisible = true;
-					}
+
+					this.gui.enableAnnotation(mesh);
 				}
 			});
 
@@ -182,10 +170,8 @@ export default class EpiDataModule {
 				.forEach(([flag, mesh]) => {
 					if (!fitFlags.includes(flag) && mesh.isEnabled()) {
 						mesh.setEnabled(false);
-						const bushEntry = this.getBushEntry(mesh) as FBushData;
-						if (bushEntry.annotation) {
-							this.flagAnnotations.get(bushEntry).isVisible = false;
-						}
+
+						this.gui.disableAnnotation(mesh);
 					}
 				});
 		}
@@ -214,11 +200,6 @@ export default class EpiDataModule {
 				},
 				this.scene
 			);
-			const annotation = this.unloadedAnnotations.find((ann) => ann.mesh === flagName);
-			if (annotation) {
-				this.unloadedAnnotations.splice(this.unloadedAnnotations.indexOf(annotation), 1);
-				this.addAnnotation(mesh, annotation.text, true);
-			}
 
 			// Apply optimizations
 			mesh.freezeWorldMatrix();
@@ -241,6 +222,7 @@ export default class EpiDataModule {
 			}
 		});
 
+		this.gui.checkAnnotations();
 		this.currentRenderedFlagData = fitFlags;
 		this.events.dispatch('FLAG_SHOW');
 	}
@@ -258,20 +240,30 @@ export default class EpiDataModule {
 		const fitArcs = arcs.filter((arc) => arc.score >= (minVal / 100) * this.arcTracks[arc.id].max);
 
 		// Arcs whose meshes need to be generated
-		const newArcs = this.arcMeshes ? fitArcs.filter((arc) => arc.id in this.arcMeshes && !this.arcMeshes[arc.id].has(arc)) : fitArcs;
+		const newArcs = this.arcMeshes
+			? fitArcs.filter((arc) => arc.id in this.arcMeshes && !this.arcMeshes[arc.id].has(arc))
+			: fitArcs;
 
 		if (this.arcMeshes) {
 			// Enable the arcs that were previously disabled that are supposed to be rendered in this call
 			fitArcs.forEach((arc) => {
-				if (arc.id in this.arcMeshes && this.arcMeshes[arc.id].has(arc) && !this.arcMeshes[arc.id].get(arc).enabled) {
+				if (
+					arc.id in this.arcMeshes &&
+					this.arcMeshes[arc.id].has(arc) &&
+					!this.arcMeshes[arc.id].get(arc).enabled
+				) {
 					const meshes = this.arcMeshes[arc.id].get(arc);
 					meshes.enabled = true;
 					meshes.lines.setEnabled(true);
 					meshes.cubes.forEach((cube) => cube.setEnabled(true));
 					meshes.tris.forEach((tri) => tri.setEnabled(true));
 					const bushEntry = this.getBushEntry(meshes.lines) as ABushData;
-					if (bushEntry.annotation) {
-						this.arcAnnotations.get(bushEntry).isVisible = true;
+
+					const annotatedMeshes = this.annotatedArcMeshes.get(bushEntry);
+					if (annotatedMeshes) {
+						annotatedMeshes.forEach((mesh) => {
+							this.gui.enableAnnotation(mesh);
+						});
 					}
 				}
 			});
@@ -286,8 +278,12 @@ export default class EpiDataModule {
 						mesh.cubes.forEach((cube) => cube.setEnabled(false));
 						mesh.tris.forEach((tri) => tri.setEnabled(false));
 						const bushEntry = this.getBushEntry(mesh.lines) as ABushData;
-						if (bushEntry.annotation) {
-							this.arcAnnotations.get(bushEntry).isVisible = false;
+
+						const annotatedMeshes = this.annotatedArcMeshes.get(bushEntry);
+						if (annotatedMeshes) {
+							annotatedMeshes.forEach((mesh) => {
+								this.gui.disableAnnotation(mesh);
+							});
 						}
 					}
 				});
@@ -346,13 +342,10 @@ export default class EpiDataModule {
 				this.scene
 			);
 			linesMesh.isPickable = false;
-			const annotation = this.unloadedAnnotations.find((ann) => ann.mesh === linesName);
-			if (annotation) {
-				this.unloadedAnnotations.splice(this.unloadedAnnotations.indexOf(annotation), 1);
-				this.addAnnotation(linesMesh, annotation.text, true);
-			}
+
 			const { r: lmr, g: lmg, b: lmb } = this.arcTracks[arc.id].color;
 			linesMesh.color = new Color3(lmr / 255, lmg / 255, lmb / 255);
+
 			// Optimize
 			// mesh.freezeWorldMatrix();
 			// mesh.doNotSyncBoundingInfo = true;
@@ -374,12 +367,6 @@ export default class EpiDataModule {
 				const mat = new StandardMaterial('arc-cube-mat', this.scene);
 				cubeMesh.material = mat;
 
-				const annotation = this.unloadedAnnotations.find((ann) => ann.mesh === cubeName);
-				if (annotation) {
-					this.unloadedAnnotations.splice(this.unloadedAnnotations.indexOf(annotation), 1);
-					this.addAnnotation(cubeMesh, annotation.text, true);
-				}
-
 				return cubeMesh;
 			});
 
@@ -399,12 +386,6 @@ export default class EpiDataModule {
 				const mat = new StandardMaterial('arc-tri-mat', this.scene);
 				triMesh.material = mat;
 
-				const annotation = this.unloadedAnnotations.find((ann) => ann.mesh === triName);
-				if (annotation) {
-					this.unloadedAnnotations.splice(this.unloadedAnnotations.indexOf(annotation), 1);
-					this.addAnnotation(triMesh, annotation.text, true);
-				}
-
 				return triMesh;
 			});
 
@@ -423,6 +404,7 @@ export default class EpiDataModule {
 			}
 		});
 
+		this.gui.checkAnnotations();
 		this.currentRenderedArcData = fitArcs;
 		this.events.dispatch('ARC_SHOW');
 	}
@@ -468,19 +450,19 @@ export default class EpiDataModule {
 	public setAnnotationsShown(shown: boolean): void {
 		if (shown !== this.annotationsShown) {
 			if (!shown) {
-				this.flagAnnotations.forEach((ann) => {
-					ann.isVisible = false;
-				});
-				this.arcAnnotations.forEach((ann) => {
-					ann.isVisible = false;
+				[
+					...this.annotatedFlagMeshes.values(),
+					...[...this.annotatedArcMeshes.values()].reduce((acc, meshes) => [...acc, ...meshes], [])
+				].forEach((mesh) => {
+					this.gui.disableAnnotation(mesh);
 				});
 				this.annotationsShown = false;
 			} else {
-				this.flagAnnotations.forEach((ann) => {
-					ann.isVisible = true;
-				});
-				this.arcAnnotations.forEach((ann) => {
-					ann.isVisible = true;
+				[
+					...this.annotatedFlagMeshes.values(),
+					...[...this.annotatedArcMeshes.values()].reduce((acc, meshes) => [...acc, ...meshes], [])
+				].forEach((mesh) => {
+					this.gui.enableAnnotation(mesh);
 				});
 				this.annotationsShown = true;
 			}
@@ -504,7 +486,11 @@ export default class EpiDataModule {
 
 					if (isArc) {
 						// if the selected mesh is part of a flag, we need to find which part of the flag it is
-						const type = mesh.name.includes('lines') ? 'lines' : mesh.name.includes('cube') ? 'cubes' : 'tris';
+						const type = mesh.name.includes('lines')
+							? 'lines'
+							: mesh.name.includes('cube')
+							? 'cubes'
+							: 'tris';
 
 						const renderedArc = this.arcMeshes[rawEntry.id].get(rawEntry as RawArcTrackData);
 						// Sometimes, selection is imprecise (ie. includes data that isn't rendered), ignore those
@@ -526,93 +512,30 @@ export default class EpiDataModule {
 		);
 	}
 
-	/** Attempts to create the GUI elements for the given annotations */
-	public loadAnnotations(annotations: RawAnnotation[]): void {
-		annotations.forEach((ann) => {
-			// find the mesh that this annotation is supposed to be attached to
-			const mesh = this.scene.getMeshByName(ann.mesh);
-
-			if (mesh) {
-				// create the annotation, but DO NOT notify the server (otherwise data duplication)
-				this.addAnnotation(mesh, ann.text, true);
-			} else {
-				// keep track of the annotations for features out of view range for later loading (otherwise data duplication)
-				this.unloadedAnnotations.push(ann);
-			}
-		});
-	}
-
-	/** Attempts to create the GUI elements for the given annotation, used when getting a socket message from server */
-	public addRawAnnotation(annotation: RawAnnotation): void {
-		// find the mesh that this annotation is supposed to be attached to
-		const mesh = this.scene.getMeshByName(annotation.mesh);
-
-		if (mesh && !this.hasAnnotation(mesh)) {
-			// create the annotation, but DO NOT notify the server (otherwise data duplication)
-			this.addAnnotation(mesh, annotation.text, true);
-		} else {
-			// keep track of the annotations for features out of view range for later loading (otherwise data duplication)
-			this.unloadedAnnotations.push(annotation);
-		}
-	}
-
-	/** Removes any rendering of a raw annotation from the scene */
-	public removeRawAnnotation(meshName: string): void {
-		// find the mesh that this annotation is supposed to be attached to
-		const mesh = this.scene.getMeshByName(meshName);
-
-		if (mesh && this.hasAnnotation(mesh)) {
-			this.removeAnnotation(mesh, true);
-		}
-	}
-
-	/** Checks if a mesh is already annotated */
-	public hasAnnotation(mesh: AbstractMesh): boolean {
-		const bushEntry = this.getBushEntry(mesh);
-
-		return !!bushEntry.annotation;
-	}
-
 	/** Creates an annotation for the given mesh; will not notify server if doNotNotify is set */
 	public addAnnotation(mesh: AbstractMesh, annotation: string, doNotNotify: boolean = false): void {
 		const isArc = mesh.name.startsWith('arc');
 		const bushEntry = this.getBushEntry(mesh);
 
-		if (bushEntry) {
-			bushEntry.annotation = annotation;
+		this.gui.makeAnnotation(mesh, annotation);
+
+		if (isArc) {
+			const meshes = this.annotatedArcMeshes.get(bushEntry as ABushData);
+			if (meshes) {
+				meshes.push(mesh);
+			} else {
+				this.annotatedArcMeshes.set(bushEntry as ABushData, [mesh]);
+			}
+		} else {
+			this.annotatedFlagMeshes.set(bushEntry as FBushData, mesh);
 		}
-
-		// Make body for the BABYLON gui representation of the annotation
-		const rect = new Rectangle(mesh.name + '-annotation-body');
-		rect.background = 'rgba(0, 0, 0, 0.5)';
-		rect.height = annotation.split('\n').length * 24 + 16 + 'px';
-		rect.width =
-			annotation
-				.split('\n')
-				.map((str) => str.length)
-				.reduce((max, num) => Math.max(max, num), 0) *
-				12 +
-			'px';
-
-		// Make the text
-		const text = new TextBlock(mesh.name + '-annotation-text', annotation);
-		text.color = 'white';
-		rect.addControl(text);
-		rect.isVisible = this.annotationsShown;
-		this.gui.addControl(rect);
-		rect.linkWithMesh(mesh);
-
-		// @ts-ignore this is bad, but it makes the code a lot cleaner
-		(isArc ? this.arcAnnotations : this.flagAnnotations).set(bushEntry, rect);
-		// @ts-ignore this is bad, but it makes the code a lot cleaner
-		(isArc ? this.annotatedArcs : this.annotatedFlags).push(bushEntry);
-
-		// Notify console that a new annotation has been added
-		this.events.dispatch('CREATED_ANNOTATION', mesh);
 
 		if (!doNotNotify) {
 			// Notify server that a new annotation has been added
-			axios.post<RawAnnotation[]>(`${BACKEND_URL}/annotations`, { id: this.modelId, annotation: { mesh: mesh.name, text: annotation } });
+			axios.post<RawAnnotation[]>(`${BACKEND_URL}/annotations`, {
+				id: this.modelId,
+				annotation: { mesh: mesh.name, text: annotation }
+			});
 		}
 	}
 
@@ -621,25 +544,20 @@ export default class EpiDataModule {
 		const isArc = mesh.name.startsWith('arc');
 		const bushEntry = this.getBushEntry(mesh);
 
-		if (bushEntry) {
-			// @ts-ignore this is bad, but it makes the code a lot cleaner
-			(isArc ? this.annotatedArcs : this.annotatedFlags).splice(this.annotatedFlags.indexOf(bushEntry), 1);
-		}
-		bushEntry.annotation = null;
+		this.gui.removeAnnotationFromMesh(mesh);
 
-		// @ts-ignore this is bad, but it makes the code a lot cleaner
-		(isArc ? this.arcAnnotations : this.flagAnnotations).get(bushEntry).dispose();
-		// @ts-ignore this is bad, but it makes the code a lot cleaner
-		(isArc ? this.arcAnnotations : this.flagAnnotations).delete(bushEntry);
 		if (isArc) {
 			// remove from the right list
-			this.annotatedArcs = this.annotatedArcs.filter((data) => data !== bushEntry);
-		} else {
-			this.annotatedFlags = this.annotatedFlags.filter((data) => data !== bushEntry);
-		}
+			const meshes = this.annotatedArcMeshes.get(bushEntry as ABushData)!;
 
-		// Notify console that an annotation has been removed
-		this.events.dispatch('DELETED_ANNOTATION', mesh);
+			meshes.splice(meshes.indexOf(mesh), 1);
+
+			if (meshes.length === 0) {
+				this.annotatedArcMeshes.delete(bushEntry as ABushData);
+			}
+		} else {
+			this.annotatedFlagMeshes.delete(bushEntry as FBushData);
+		}
 
 		if (!doNotNotify) {
 			// Notify server that an annotation has been removed

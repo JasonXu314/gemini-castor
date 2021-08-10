@@ -40,7 +40,7 @@
 					});
 				}),
 				axios.get<Blob>(`${BACKEND_URL}/${id}.epi`, { responseType: 'blob' }).then((res) => {
-					return new Promise<{ arcs: RawArcTrackData[]; flags: RawFlagTrackData[] }>((resolve) => {
+					return new Promise<{ arcs: ArcTrackLite[]; flags: FlagTrackLite[] }>((resolve) => {
 						const fr = new FileReader();
 
 						fr.onloadend = () => {
@@ -63,7 +63,8 @@
 						flagsVisible: res.data.modelData.flagsVisible
 					},
 					res.data.sortHist.length + 1,
-					res.data.annotations
+					res.data.annotations,
+					res.data.highlights
 				);
 				game.preview();
 			});
@@ -74,8 +75,8 @@
 <canvas
 	class="canvas"
 	bind:this={canvas}
-	width={typeof window === 'undefined' ? 800 : window.innerWidth}
-	height={typeof window === 'undefined' ? 600 : window.innerHeight}
+	width={typeof window === 'undefined' ? 800 : window.innerWidth - 1}
+	height={typeof window === 'undefined' ? 600 : window.innerHeight - 1}
 />
 
 <style>

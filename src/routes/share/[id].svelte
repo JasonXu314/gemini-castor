@@ -5,13 +5,12 @@
 	import FancyInput from '$lib/components/FancyInput.svelte';
 	import GameLite from '$lib/game';
 	import { BACKEND_URL } from '$lib/utils/constants';
-	import { decodeEpiData,decodeRefGenes,decodeStruct } from '$lib/utils/serializations';
+	import { decodeEpiData, decodeRefGenes, decodeStruct } from '$lib/utils/serializations';
 	import MySocket from '$lib/utils/sock';
-	import { historyStore,viewStore } from '$lib/utils/stores';
+	import { historyStore, viewStore } from '$lib/utils/stores';
 	import { compareSorts } from '$lib/utils/utils';
 	import axios from 'axios';
-	import { onMount,setContext } from 'svelte';
-
+	import { onMount, setContext } from 'svelte';
 
 	let canvas: HTMLCanvasElement,
 		game: GameLite,
@@ -33,19 +32,27 @@
 
 	setContext<HistoryContext>('HISTORY_CONTEXT', {
 		renameSort: ({ _id, name }: Sort) => {
-			axios.patch<Sort[]>(`${BACKEND_URL}/history`, { id, _id, name }).catch(() => alert('Failed to rename sort; name will be lost on refresh'));
+			axios
+				.patch<Sort[]>(`${BACKEND_URL}/history`, { id, _id, name })
+				.catch(() => alert('Failed to rename sort; name will be lost on refresh'));
 		},
 		deleteSort: ({ _id, name }: Sort) => {
-			axios.delete<Sort[]>(`${BACKEND_URL}/history`, { data: { id, _id, name } }).catch(() => alert('Failed to delete sort'));
+			axios
+				.delete<Sort[]>(`${BACKEND_URL}/history`, { data: { id, _id, name } })
+				.catch(() => alert('Failed to delete sort'));
 		}
 	});
 
 	setContext<ViewContext>('VIEW_CONTEXT', {
 		renameView: ({ _id, name }: View) => {
-			axios.patch<View[]>(`${BACKEND_URL}/views`, { id, _id, name }).catch(() => alert('Failed to rename view; name will be lost on refresh'));
+			axios
+				.patch<View[]>(`${BACKEND_URL}/views`, { id, _id, name })
+				.catch(() => alert('Failed to rename view; name will be lost on refresh'));
 		},
 		deleteView: ({ _id, name }: View) => {
-			axios.delete<View[]>(`${BACKEND_URL}/views`, { data: { id, _id, name } }).catch(() => alert('Failed to delete view'));
+			axios
+				.delete<View[]>(`${BACKEND_URL}/views`, { data: { id, _id, name } })
+				.catch(() => alert('Failed to delete view'));
 		}
 	});
 
@@ -105,7 +112,8 @@
 							flagsVisible: res.data.modelData.flagsVisible
 						},
 						res.data.sortHist.length + 1,
-						res.data.annotations
+						res.data.annotations,
+						res.data.highlights
 					);
 					sortHist = res.data.sortHist;
 					viewStore.set(res.data.views);
@@ -132,6 +140,9 @@
 						'HIST_ADD',
 						'HIST_DEL',
 						'HIST_EDIT',
+						'HIGHLIGHT_ADD',
+						'HIGHLIGHT_DEL',
+						'HIGHLIGHT_EDIT',
 						'VIEW_ADD',
 						'VIEW_DEL',
 						'VIEW_EDIT',
@@ -167,8 +178,26 @@
 						});
 					});
 
+					mainSock.on('HIGHLIGHT_ADD', ({ newHighlight }) => {
+						if (!game.highlights.highlights.has(newHighlight.id)) {
+							game.highlights.loadHighlight(newHighlight);
+						}
+					});
+
+					mainSock.on('HIGHLIGHT_EDIT', ({ id, name }) => {
+						game.highlights.editHighlight(id, name);
+					});
+
+					mainSock.on('HIGHLIGHT_DEL', ({ id }) => {
+						if (game.highlights.highlights.has(id)) {
+							game.highlights.deleteHighlight(id);
+						}
+					});
+
 					mainSock.on('VIEW_ADD', ({ newView }) => viewStore.update((prevViews) => [...prevViews, newView]));
-					mainSock.on('VIEW_DEL', ({ id }) => viewStore.update((prevViews) => prevViews.filter((view) => view._id !== id)));
+					mainSock.on('VIEW_DEL', ({ id }) =>
+						viewStore.update((prevViews) => prevViews.filter((view) => view._id !== id))
+					);
 					mainSock.on('VIEW_EDIT', ({ id, name }) =>
 						viewStore.update((prevViews) =>
 							prevViews.map((view) => {
@@ -181,11 +210,11 @@
 					);
 
 					mainSock.on('ANN_ADD', ({ newAnnotation }) => {
-						game.epiData.addRawAnnotation(newAnnotation);
+						game.gui.loadAnnotation(newAnnotation);
 					});
 
 					mainSock.on('ANN_DEL', ({ mesh }) => {
-						game.epiData.removeRawAnnotation(mesh);
+						game.gui.removeAnnotationByName(mesh);
 					});
 
 					socket = mainSock;
@@ -243,8 +272,8 @@
 	<canvas
 		class="canvas"
 		bind:this={canvas}
-		width={typeof window === 'undefined' ? 800 : window.innerWidth}
-		height={typeof window === 'undefined' ? 600 : window.innerHeight}
+		width={typeof window === 'undefined' ? 800 : window.innerWidth - 1}
+		height={typeof window === 'undefined' ? 600 : window.innerHeight - 1}
 	/>
 	{#if game}
 		<Console {game} {socket} {socketId} {liveSession} />
@@ -285,7 +314,8 @@
 	{#if askLive}
 		<div class="live-menu">
 			<h4 class="alert">
-				{liveSession.participants.find(({ id }) => id === liveSession.hostID).name} is hosting a live session on this model, would you like to join?
+				{liveSession.participants.find(({ id }) => id === liveSession.hostID).name} is hosting a live session on this
+				model, would you like to join?
 			</h4>
 			<FancyInput bind:value={liveName} label="Name" id="live-name" />
 			<div class="button-row">
