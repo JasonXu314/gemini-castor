@@ -11,10 +11,11 @@
 	export let socketId: string;
 	export let liveSession: LiveSessionData | null;
 	export let closed: boolean;
+	export let inSession: boolean = false;
+	export let inControl: boolean = false;
 
 	let name: string = '',
 		hasLive: boolean = false,
-		inSession: boolean = false,
 		hostId: string | null = null,
 		controllerId: string | null = null,
 		participants: LiveParticipant[] = [],
@@ -26,6 +27,7 @@
 	$: participants = liveSession ? liveSession.participants : [];
 	$: hostId = liveSession ? liveSession.hostID : null;
 	$: controllerId = liveSession ? liveSession.controllerID : null;
+	$: inControl = inSession && controllerId === socketId;
 
 	$: {
 		if (liveSession) {
@@ -124,6 +126,43 @@
 		}
 	});
 
+	socket.on('RADIUS_START', () => {
+		if (inSession && !inControl) {
+			game.radSelect.start(true);
+			game.canvas.dispatchEvent(new Event('dblclick'));
+		}
+	});
+
+	socket.on('RADIUS_PARAM_CHANGE', ({ position, radius }) => {
+		if (inSession && !inControl) {
+			if (position) {
+				const { x, y, z } = game.radSelect.position;
+				game.radSelect.updatePosition({ x, y, z, ...position });
+			}
+			if (radius) {
+				game.radSelect.updateRadius(radius);
+			}
+		}
+	});
+
+	socket.on('RADIUS_SET', () => {
+		if (inSession && !inControl) {
+			game.radSelect.finalize();
+		}
+	});
+
+	socket.on('EXECUTE_SELECTORS', () => {
+		if (inSession && !inControl) {
+			game.executeSearches();
+		}
+	});
+
+	socket.on('CLEAR_SELECTORS', () => {
+		if (inSession && !inControl) {
+			game.reset();
+		}
+	});
+
 	game.events.on('CAM_CHANGE', () => {
 		if (inSession && controllerId === socketId) {
 			const { x, y, z } = game.camera.position;
@@ -137,11 +176,38 @@
 		}
 	});
 
+	game.radSelect.events.on('PARAMS_CHANGE', (params) => {
+		if (inSession && inControl) {
+			socket.send({ type: 'RADIUS_PARAM_CHANGE', ...params });
+		}
+	});
+
+	game.events.on('ACTIVE', () => {
+		if (inSession && inControl) {
+			socket.send({ type: 'EXECUTE_SELECTORS' });
+		}
+	});
+
+	game.events.on('RESET', () => {
+		if (inSession && inControl) {
+			socket.send({ type: 'CLEAR_SELECTORS' });
+		}
+	});
+
 	game.events.on('SELECT_FEATURE', (selectedFeature: EpiDataFeature) => {
 		if (inSession && controllerId === socketId) {
 			socket.send({
 				type: 'SELECT_MESH',
 				mesh: selectedFeature.mesh.name
+			});
+		}
+	});
+
+	game.events.on('SELECT_HIGHLIGHT', (selectedHighlight: RawHighlight) => {
+		if (inSession && controllerId === socketId) {
+			socket.send({
+				type: 'SELECT_MESH',
+				mesh: `highlight-${selectedHighlight.id}`
 			});
 		}
 	});

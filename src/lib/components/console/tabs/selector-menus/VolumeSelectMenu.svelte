@@ -5,6 +5,8 @@
 
 	export let game: GameLite;
 	export let closed: boolean;
+	export let inSession: boolean;
+	export let inControl: boolean;
 
 	let maxX: number = 1000,
 		minX: number = -1000,
@@ -123,7 +125,7 @@
 <div class="main" class:hidden={closed}>
 	<Slider
 		dark
-		disabled={set}
+		disabled={set || (inSession && !inControl)}
 		min={Math.floor(game.structure.minX)}
 		max={Math.ceil(game.structure.maxX)}
 		label="Maximum X"
@@ -132,7 +134,7 @@
 	/>
 	<Slider
 		dark
-		disabled={set}
+		disabled={set || (inSession && !inControl)}
 		min={Math.floor(game.structure.minY)}
 		max={Math.ceil(game.structure.maxY)}
 		label="Maximum Y"
@@ -141,7 +143,7 @@
 	/>
 	<Slider
 		dark
-		disabled={set}
+		disabled={set || (inSession && !inControl)}
 		min={Math.floor(game.structure.minZ)}
 		max={Math.ceil(game.structure.maxZ)}
 		label="Maximum Z"
@@ -150,7 +152,7 @@
 	/>
 	<Slider
 		dark
-		disabled={set}
+		disabled={set || (inSession && !inControl)}
 		min={Math.floor(game.structure.minX)}
 		max={Math.ceil(game.structure.maxX)}
 		label="Minimum X"
@@ -159,7 +161,7 @@
 	/>
 	<Slider
 		dark
-		disabled={set}
+		disabled={set || (inSession && !inControl)}
 		min={Math.floor(game.structure.minY)}
 		max={Math.ceil(game.structure.maxY)}
 		label="Minimum Y"
@@ -168,7 +170,7 @@
 	/>
 	<Slider
 		dark
-		disabled={set}
+		disabled={set || (inSession && !inControl)}
 		max={Math.ceil(game.structure.maxZ)}
 		min={Math.floor(game.structure.minZ)}
 		label="Minimum Z"
@@ -176,9 +178,15 @@
 		bind:value={minZ}
 	/>
 	<div class="button-row">
-		<Button type={selecting ? 'cancel' : 'action'} on:click={selecting ? cancel : start}>{selecting ? 'Cancel' : 'Place!'}</Button>
-		<Button type={set ? 'cancel' : 'action'} on:click={set ? reset : finalize}>{set ? 'Reset' : 'Set!'}</Button>
-		<Button type="action" on:click={search}>Search!</Button>
+		<Button
+			disabled={inSession && !inControl}
+			type={selecting ? 'cancel' : 'action'}
+			on:click={selecting ? cancel : start}>{selecting ? 'Cancel' : 'Place!'}</Button
+		>
+		<Button disabled={inSession && !inControl} type={set ? 'cancel' : 'action'} on:click={set ? reset : finalize}
+			>{set ? 'Reset' : 'Set!'}</Button
+		>
+		<Button disabled={inSession && !inControl} type="action" on:click={search}>Search!</Button>
 	</div>
 	<div class="check-row">
 		<label for="guidemesh-box">Show Guide Mesh?</label>

@@ -47,6 +47,12 @@ type SocketReceiveMsgs = {
 	SELECT_MESH: { type: 'SELECT_MESH'; mesh: string };
 	TRANSFER_CONTROL: { type: 'TRANSFER_CONTROL'; id: string };
 	REQUEST_CONTROL: { type: 'REQUEST_CONTROL'; id: string; name: string };
+	RADIUS_START: { type: 'RADIUS_START' };
+	RADIUS_PARAM_CHANGE: { type: 'RADIUS_PARAM_CHANGE' } & RecursivePartial<RadSelectParams>;
+	RADIUS_SET: { type: 'RADIUS_SET' };
+	RADIUS_RESET: { type: 'RADIUS_RESET' };
+	EXECUTE_SELECTORS: { type: 'EXECUTE_SELECTORS' };
+	CLEAR_SELECTORS: { type: 'CLEAR_SELECTORS' };
 };
 
 type SocketSendMsgs = {
@@ -60,7 +66,15 @@ type SocketSendMsgs = {
 	TRANSFER_CONTROL: { type: 'TRANSFER_CONTROL'; id: string };
 	REVERT_CONTROL: { type: 'REVERT_CONTROL' };
 	REQUEST_CONTROL: { type: 'REQUEST_CONTROL'; id: string };
+	RADIUS_START: { type: 'RADIUS_START' };
+	RADIUS_PARAM_CHANGE: { type: 'RADIUS_PARAM_CHANGE' } & RecursivePartial<RadSelectParams>;
+	RADIUS_SET: { type: 'RADIUS_SET' };
+	RADIUS_RESET: { type: 'RADIUS_RESET' };
+	EXECUTE_SELECTORS: { type: 'EXECUTE_SELECTORS' };
+	CLEAR_SELECTORS: { type: 'CLEAR_SELECTORS' };
 };
+
+type RecursivePartial<T> = { [K in keyof T]?: RecursivePartial<T[K]> };
 
 interface RawVector3 {
 	x: number;

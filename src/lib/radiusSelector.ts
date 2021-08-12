@@ -2,7 +2,11 @@ import { Color3, MeshBuilder, StandardMaterial, Vector3 } from '$lib/utils/babyl
 import type EpiDataModule from './epiData';
 import type GameLite from './game';
 import type StructureModule from './structure';
-import { distance, Logger } from './utils/utils';
+import { distance, EventSrc, Logger } from './utils/utils';
+
+interface RadiusSelectorEvents {
+	PARAMS_CHANGE: RecursivePartial<RadSelectParams>;
+}
 
 /**
  * Class to handle all operations regarding the radius selector
@@ -10,6 +14,8 @@ import { distance, Logger } from './utils/utils';
 export default class RadiusSelectorModule {
 	/** Logger module */
 	private logger: Logger;
+
+	public events: EventSrc<RadiusSelectorEvents>;
 
 	/** Guidance mesh (sphere) that tells the user where the selection is occuring (null if not placing) */
 	private guideMesh: Mesh | null;
@@ -26,6 +32,8 @@ export default class RadiusSelectorModule {
 
 	/** Whether the user is placing the selection mesh */
 	public initPos: boolean;
+
+	public noControl: boolean = false;
 
 	/** If the user has placed the selection mesh, but has not locked in the search parameters */
 	public settingParams: boolean;
@@ -59,6 +67,7 @@ export default class RadiusSelectorModule {
 		private game: GameLite
 	) {
 		this.logger = new Logger('Radius Selector');
+
 		this.rejectStart = null;
 		this.initPos = false;
 		this.settingParams = false;
@@ -69,17 +78,26 @@ export default class RadiusSelectorModule {
 		this.guideMesh = null;
 		this.structCache = {};
 		this.epiDataCache = {};
+
+		this.events = new EventSrc<RadiusSelectorEvents>(['PARAMS_CHANGE']);
+
 		this.logger.log('Initialized');
 	}
 
 	/**
 	 * Start the sort (ie. start placing the selector mesh)
+	 * @param noControl indicates that the guide mesh should not be controlled by the user's camera movement (used for selector sync feature)
 	 * @returns a promise that will resolve when the selector mesh is placed (or reject if canceled)
 	 */
-	public async start(): Promise<void> {
+	public async start(noControl: boolean = false): Promise<void> {
+		this.noControl = noControl;
 		return new Promise((resolve, reject) => {
 			// Create guidance mesh
-			const guideMesh = MeshBuilder.CreateSphere('sphericalbound', { segments: 8, diameter: 2, updatable: true }, this.scene);
+			const guideMesh = MeshBuilder.CreateSphere(
+				'sphericalbound',
+				{ segments: 8, diameter: 2, updatable: true },
+				this.scene
+			);
 			guideMesh.material = new StandardMaterial('guideballmaterial', this.scene);
 			guideMesh.material.wireframe = true;
 			guideMesh.scaling = new Vector3(300, 300, 300);
@@ -131,23 +149,6 @@ export default class RadiusSelectorModule {
 			maxY: position.y + radius,
 			maxZ: position.z + radius
 		});
-
-		// const denoodled = denoodle(dataArray);
-		// const structure = denoodled.map((coords) => {
-		// 	const viewRatio = this.viewRegion.length / this.structure.data.length;
-		// 	const startTag = coords[0].tag,
-		// 		stopTag = coords[coords.length - 1].tag,
-		// 		lowerBP = Math.round((startTag / this.structure.data.length) * this.viewRegion.length) + this.viewRegion.start - Math.round(viewRatio / 2),
-		// 		upperBP = Math.round((stopTag / this.structure.data.length) * this.viewRegion.length) + this.viewRegion.start + Math.round(viewRatio / 2),
-		// 		BP: number[] = [],
-		// 		chrNumber = this.viewRegion.chr;
-
-		// 	for (let i = lowerBP; i <= upperBP; i++) {
-		// 		BP.push(i);
-		// 	}
-
-		// 	return { coords, lowerCoord: coords[0], upperCoord: coords[coords.length - 1], BP, lowerBP, upperBP, chrNumber };
-		// });
 
 		// Refine rough selection of points by verifying
 		const results = dataArray
@@ -259,6 +260,7 @@ export default class RadiusSelectorModule {
 		if (this.settingParams) {
 			this.guideMesh.scaling = new Vector3(rad, rad, rad);
 			this.radius = rad;
+			this.events.dispatch('PARAMS_CHANGE', { radius: rad });
 		}
 	}
 
@@ -271,6 +273,7 @@ export default class RadiusSelectorModule {
 		if (this.settingParams) {
 			this.guideMesh.position[coord] = value;
 			this.position[coord] = value;
+			this.events.dispatch('PARAMS_CHANGE', { position: { [coord]: value } });
 		}
 	}
 
@@ -285,6 +288,7 @@ export default class RadiusSelectorModule {
 		this.position.x = pos.x;
 		this.position.y = pos.y;
 		this.position.z = pos.z;
+		this.events.dispatch('PARAMS_CHANGE', { position: pos });
 	}
 
 	/**
@@ -361,14 +365,20 @@ export default class RadiusSelectorModule {
 		if (this.game.hoverMesh) {
 			this.guideMesh.position = this.game.hoverMesh.getBoundingInfo().boundingSphere.center.clone();
 			this.radius = this.game.hoverMesh.getBoundingInfo().boundingSphere.radius;
+			this.position = this.guideMesh.position;
 			this.guideMesh.scaling = new Vector3(this.radius, this.radius, this.radius);
+			const { x, y, z } = this.position;
+			this.events.dispatch('PARAMS_CHANGE', { position: { x, y, z }, radius: this.radius });
 		} else {
 			const pickInfo = this.scene.pick(this.scene.pointerX, this.scene.pointerY);
 			this.guideMesh.position = this.scene.activeCamera.position.add(pickInfo.ray.direction.scale(2000));
+			this.position = this.guideMesh.position;
 			if (this.radius !== 300) {
 				this.radius = 300;
 				this.guideMesh.scaling = new Vector3(this.radius, this.radius, this.radius);
 			}
+			const { x, y, z } = this.position;
+			this.events.dispatch('PARAMS_CHANGE', { position: { x, y, z }, radius: this.radius });
 		}
 	}
 }

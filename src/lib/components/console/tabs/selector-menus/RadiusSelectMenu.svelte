@@ -1,10 +1,14 @@
 <script lang="ts">
 	import type GameLite from '$lib/game';
+	import type MySocket from '$lib/utils/sock';
 	import Button from '../../../Button.svelte';
 	import Slider from '../../../Slider.svelte';
 
 	export let game: GameLite;
 	export let closed: boolean;
+	export let inSession: boolean;
+	export let inControl: boolean;
+	export let socket: MySocket<SocketReceiveMsgs, SocketSendMsgs>;
 
 	let radius: number = 300,
 		initPos: boolean = false,
@@ -26,15 +30,10 @@
 		}
 	});
 
-	$: {
-		if (settingParams) {
-			game.radSelect.updateRadius(radius);
-		}
-	}
-
-	$: if (settingParams) game.radSelect.updatePos('x', x);
-	$: if (settingParams) game.radSelect.updatePos('y', y);
-	$: if (settingParams) game.radSelect.updatePos('z', z);
+	$: game.radSelect.updateRadius(radius);
+	$: game.radSelect.updatePos('x', x);
+	$: game.radSelect.updatePos('y', y);
+	$: game.radSelect.updatePos('z', z);
 
 	$: {
 		if (initPos && !showGuide) {
@@ -86,6 +85,10 @@
 				});
 			initPos = true;
 
+			if (inSession && inControl) {
+				socket.send({ type: 'RADIUS_START' });
+			}
+
 			setTimeout(() => {
 				game.canvas.focus();
 			}, 0);
@@ -95,6 +98,9 @@
 	function search(): void {
 		if (paramsSet) {
 			game.executeSearches();
+			if (inSession && inControl) {
+				socket.send({ type: 'EXECUTE_SELECTORS' });
+			}
 		}
 	}
 
@@ -103,6 +109,9 @@
 			game.radSelect.finalize();
 			settingParams = false;
 			paramsSet = true;
+			if (inSession && inControl) {
+				socket.send({ type: 'RADIUS_SET' });
+			}
 		}
 	}
 
@@ -121,15 +130,25 @@
 	function reset(): void {
 		if (paramsSet) {
 			game.radSelect.reset();
+			if (inSession && inControl) {
+				socket.send({ type: 'RADIUS_RESET' });
+			}
 		}
 	}
 </script>
 
 <div class="main" class:hidden={closed}>
-	<Slider dark disabled={game && game.radSelect.active} min={100} max={3000} label="Radius" bind:value={radius} />
 	<Slider
 		dark
-		disabled={game && game.radSelect.active}
+		disabled={(game && game.radSelect.active) || (inSession && !inControl)}
+		min={100}
+		max={3000}
+		label="Radius"
+		bind:value={radius}
+	/>
+	<Slider
+		dark
+		disabled={(game && game.radSelect.active) || (inSession && !inControl)}
 		min={Math.floor(game.structure.minX)}
 		max={Math.ceil(game.structure.maxX)}
 		label="x"
@@ -137,7 +156,7 @@
 	/>
 	<Slider
 		dark
-		disabled={game && game.radSelect.active}
+		disabled={(game && game.radSelect.active) || (inSession && !inControl)}
 		min={Math.floor(game.structure.minY)}
 		max={Math.ceil(game.structure.maxY)}
 		label="y"
@@ -145,7 +164,7 @@
 	/>
 	<Slider
 		dark
-		disabled={game && game.radSelect.active}
+		disabled={(game && game.radSelect.active) || (inSession && !inControl)}
 		min={Math.floor(game.structure.minZ)}
 		max={Math.ceil(game.structure.maxZ)}
 		label="z"
@@ -155,11 +174,20 @@
 		Show Guide Mesh?
 		<input type="checkbox" id="show-guide" disabled={initPos} bind:checked={showGuide} />
 	</label>
-	<Button type={initPos || settingParams ? 'cancel' : 'action'} on:click={initPos || settingParams ? cancel : start}
-		>{initPos || settingParams ? 'Double-click anywhere to set selector center, or click here to cancel' : 'Place!'}</Button
+	<Button
+		disabled={inSession && !inControl}
+		type={initPos || settingParams ? 'cancel' : 'action'}
+		on:click={initPos || settingParams ? cancel : start}
+		>{initPos || settingParams
+			? 'Double-click anywhere to set selector center, or click here to cancel'
+			: 'Place!'}</Button
 	>
-	<Button type={paramsSet ? 'cancel' : 'action'} on:click={paramsSet ? reset : finalize}>{paramsSet ? 'Reset' : 'Set!'}</Button>
-	<Button type="action" disabled={initPos} on:click={search}>Search!</Button>
+	<Button
+		disabled={inSession && !inControl}
+		type={paramsSet ? 'cancel' : 'action'}
+		on:click={paramsSet ? reset : finalize}>{paramsSet ? 'Reset' : 'Set!'}</Button
+	>
+	<Button disabled={initPos || (inSession && !inControl)} type="action" on:click={search}>Search!</Button>
 </div>
 
 <style>

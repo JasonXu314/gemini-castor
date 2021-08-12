@@ -152,7 +152,12 @@
 						'CAM_CHANGE',
 						'SELECT_MESH',
 						'TRANSFER_CONTROL',
-						'REQUEST_CONTROL'
+						'REQUEST_CONTROL',
+						'RADIUS_START',
+						'RADIUS_PARAM_CHANGE',
+						'RADIUS_SET',
+						'RADIUS_RESET',
+						'EXECUTE_SELECTORS'
 					]);
 
 					mainSock.send({ type: 'LINK', id: res.data.socketId, roomId: id });

@@ -6,6 +6,8 @@
 
 	export let game: GameLite;
 	export let closed: boolean;
+	export let inSession: boolean;
+	export let inControl: boolean;
 
 	let regions: string = '',
 		radius: number = 500,
@@ -73,16 +75,31 @@
 </script>
 
 <div class="main" class:hidden={closed}>
-	<FancyInput dark id="chrs" label="Chromosome Segments" on:blur={tryUpdate} on:change={resetDebounce} bind:value={regions} />
+	<FancyInput
+		dark
+		id="chrs"
+		label="Chromosome Segments"
+		disabled={inSession && !inControl}
+		on:blur={tryUpdate}
+		on:change={resetDebounce}
+		bind:value={regions}
+	/>
 	{#if errMsg}
 		<div class="err">{errMsg}</div>
 	{/if}
 	<div class="slider-row">
-		<Slider dark disabled={locked} min={0} max={1000} label="Radius" bind:value={radius} />
+		<Slider
+			dark
+			disabled={locked || (inSession && !inControl)}
+			min={0}
+			max={1000}
+			label="Radius"
+			bind:value={radius}
+		/>
 	</div>
 	<div class="btn-row">
-		<Button type="action" on:click={set}>Set!</Button>
-		<Button type="action" disabled={!locked} on:click={search}>Search!</Button>
+		<Button type="action" disabled={inSession && !inControl} on:click={set}>Set!</Button>
+		<Button type="action" disabled={!locked || (inSession && !inControl)} on:click={search}>Search!</Button>
 	</div>
 </div>
 

@@ -5,7 +5,6 @@
 	import axios from 'axios';
 	import Button from '../../Button.svelte';
 
-
 	export let game: GameLite;
 	export let closed: boolean;
 
@@ -23,6 +22,7 @@
 		selectedFeature = feature;
 		if (selectedHighlight) {
 			selectedHighlight = null;
+			tempName = null;
 		}
 	});
 	game.events.on('SELECT_HIGHLIGHT', (highlight: RawHighlight) => {
@@ -289,14 +289,14 @@
 					<div class="middle">
 						<h4 class="title">Position</h4>
 						<div class="info">
-							<div
-								>Min X: {selectedHighlight.params.minX} Min Y: {selectedHighlight.params.minY} Min Z: {selectedHighlight
-									.params.minZ}</div
-							>
-							<div
-								>Max X: {selectedHighlight.params.maxX} Max Y: {selectedHighlight.params.maxY} Max Z: {selectedHighlight
-									.params.maxZ}</div
-							>
+							<div>
+								Min X: {selectedHighlight.params.minX} Min Y: {selectedHighlight.params.minY} Min Z: {selectedHighlight
+									.params.minZ}
+							</div>
+							<div>
+								Max X: {selectedHighlight.params.maxX} Max Y: {selectedHighlight.params.maxY} Max Z: {selectedHighlight
+									.params.maxZ}
+							</div>
 						</div>
 					</div>
 				</div>

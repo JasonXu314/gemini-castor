@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type GameLite from '$lib/game';
 	import { Vector3 } from '$lib/utils/babylon';
+	import { LINE_BLACK, LINE_WHITE, STEEL, WHITE } from '$lib/utils/constants';
 	import type MySocket from '$lib/utils/sock';
 	import Button from '../Button.svelte';
 	import GeneralInfo from './tabs/GeneralInfo.svelte';
@@ -15,8 +16,11 @@
 	export let socketId: string;
 	export let liveSession: LiveSessionData | null;
 
+	let inSession: boolean, inControl: boolean;
+
 	let collapsed: boolean = false,
-		tabNum: number = 0;
+		tabNum: number = 0,
+		background = STEEL;
 
 	function recallSort(sort: Sort) {
 		tabNum = 1;
@@ -29,6 +33,17 @@
 		game.camera.position = new Vector3(x, y, z);
 		game.camera.rotation = new Vector3(rx, ry, rz);
 	}
+
+	function toggleBackground() {
+		background = background === STEEL ? WHITE : STEEL;
+		game.scene.clearColor = background;
+		game.xAxis.color = background === STEEL ? LINE_WHITE : LINE_BLACK;
+		game.yAxis.color = background === STEEL ? LINE_WHITE : LINE_BLACK;
+		game.zAxis.color = background === STEEL ? LINE_WHITE : LINE_BLACK;
+	}
+
+	$: console.log('In session changed', inSession);
+	$: console.log('In control changed', inControl);
 </script>
 
 <div class="main" class:collapsed>
@@ -40,14 +55,15 @@
 		<Button type="tab" on:click={() => (tabNum = 3)}>History</Button>
 		<Button type="tab" on:click={() => (tabNum = 4)}>Views</Button>
 		<Button type="tab" on:click={() => (tabNum = 5)}>Live Session</Button>
+		<Button type="tab" on:click={toggleBackground}>BG: {background === STEEL ? 'steel' : 'white'}</Button>
 	</div>
 	<div class="body" class:hidden={collapsed}>
 		<GeneralInfo closed={tabNum !== 0} {game} />
-		<Selectors closed={tabNum !== 1} {game} />
+		<Selectors closed={tabNum !== 1} {game} {inSession} {inControl} {socket} />
 		<RegionHighlights closed={tabNum !== 2} {game} />
 		<SortHistory closed={tabNum !== 3} {recallSort} {game} />
 		<ViewHistory closed={tabNum !== 4} {recallView} {game} />
-		<LiveSession closed={tabNum !== 5} {game} {socket} {socketId} {liveSession} />
+		<LiveSession closed={tabNum !== 5} {game} {socket} {socketId} {liveSession} bind:inSession bind:inControl />
 	</div>
 </div>
 

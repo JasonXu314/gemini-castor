@@ -1,6 +1,7 @@
 <script lang="ts">
 	import Button from '$lib/components/Button.svelte';
 	import type GameLite from '$lib/game';
+	import type MySocket from '$lib/utils/sock';
 	import BasePairSelectMenu from './selector-menus/BasePairSelectMenu.svelte';
 	import GeneralMenu from './selector-menus/GeneralMenu.svelte';
 	import RadiusSelectMenu from './selector-menus/RadiusSelectMenu.svelte';
@@ -8,6 +9,9 @@
 
 	export let game: GameLite;
 	export let closed: boolean;
+	export let inSession: boolean;
+	export let inControl: boolean;
+	export let socket: MySocket<SocketReceiveMsgs, SocketSendMsgs>;
 
 	let openMenu: number = 0;
 
@@ -22,9 +26,9 @@
 	</div>
 	<div class="content">
 		<GeneralMenu {game} closed={openMenu !== 0} />
-		<RadiusSelectMenu {game} closed={openMenu !== 1} />
-		<VolumeSelectMenu {game} closed={openMenu !== 2} />
-		<BasePairSelectMenu {game} closed={openMenu !== 3} />
+		<RadiusSelectMenu {game} closed={openMenu !== 1} {inSession} {inControl} {socket} />
+		<VolumeSelectMenu {game} closed={openMenu !== 2} {inSession} {inControl} />
+		<BasePairSelectMenu {game} closed={openMenu !== 3} {inSession} {inControl} />
 	</div>
 	<div class="btns">
 		<Button

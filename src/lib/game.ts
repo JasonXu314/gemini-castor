@@ -1,6 +1,5 @@
 import {
 	Color3,
-	Color4,
 	Engine,
 	HemisphericLight,
 	MeshBuilder,
@@ -19,6 +18,7 @@ import GUIModule from './gui';
 import HighlightsModule from './highlights';
 import RadiusSelectorModule from './radiusSelector';
 import StructureModule from './structure';
+import { LINE_WHITE } from './utils/constants';
 import {
 	compareVectors,
 	EventSrc,
@@ -54,9 +54,9 @@ export default class GameLite {
 	private logger: Logger;
 
 	private engine: Engine;
-	private xAxis: LinesMesh;
-	private yAxis: LinesMesh;
-	private zAxis: LinesMesh;
+	public xAxis: LinesMesh;
+	public yAxis: LinesMesh;
+	public zAxis: LinesMesh;
 	private optimizer: SceneOptimizer;
 
 	// Caches
@@ -168,32 +168,32 @@ export default class GameLite {
 			'x axis',
 			{
 				points: [new Vector3(-10000, 0, 0), new Vector3(10000, 0, 0)],
-				colors: [new Color4(1, 1, 1, 1), new Color4(1, 1, 1, 1)],
 				useVertexAlpha: false
 			},
 			this.scene
 		);
 		this.xAxis.isPickable = false;
+		this.xAxis.color = LINE_WHITE;
 		this.yAxis = MeshBuilder.CreateLines(
 			'y axis',
 			{
 				points: [new Vector3(0, -10000, 0), new Vector3(0, 10000, 0)],
-				colors: [new Color4(1, 1, 1, 1), new Color4(1, 1, 1, 1)],
 				useVertexAlpha: false
 			},
 			this.scene
 		);
 		this.yAxis.isPickable = false;
+		this.yAxis.color = LINE_WHITE;
 		this.zAxis = MeshBuilder.CreateLines(
 			'z axis',
 			{
 				points: [new Vector3(0, 0, -10000), new Vector3(0, 0, 10000)],
-				colors: [new Color4(1, 1, 1, 1), new Color4(1, 1, 1, 1)],
 				useVertexAlpha: false
 			},
 			this.scene
 		);
 		this.zAxis.isPickable = false;
+		this.zAxis.color = LINE_WHITE;
 
 		// Initializing modules & generating data
 		this.gui = new GUIModule(this.scene);
@@ -555,7 +555,7 @@ export default class GameLite {
 			this.engine.runRenderLoop(() => {
 				this.scene.render();
 
-				if (this.radSelect.initPos) {
+				if (this.radSelect.initPos && !this.radSelect.noControl) {
 					this.radSelect.updateGuide();
 				}
 
