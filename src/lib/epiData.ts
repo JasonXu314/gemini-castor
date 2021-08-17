@@ -419,9 +419,11 @@ export default class EpiDataModule {
 					});
 				});
 				this.flagsShown = false;
+				this.gui.checkVisible();
 			} else {
 				this.renderFlags(this.currentRenderedFlagData);
 				this.flagsShown = true;
+				this.gui.checkVisible();
 			}
 		}
 	}
@@ -439,9 +441,11 @@ export default class EpiDataModule {
 					});
 				});
 				this.arcsShown = false;
+				this.gui.checkVisible();
 			} else {
 				this.renderArcs(this.currentRenderedArcData);
 				this.arcsShown = true;
+				this.gui.checkVisible();
 			}
 		}
 	}

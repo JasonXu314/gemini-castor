@@ -129,8 +129,10 @@ export default class HighlightsModule {
 			[...this.shown.entries()].forEach(([id, entryShown]) => {
 				if (!shown && entryShown) {
 					this.highlightMeshes.get(id).setEnabled(false);
+					this.gui.checkVisible();
 				} else if (shown && entryShown) {
 					this.highlightMeshes.get(id).setEnabled(true);
+					this.gui.checkVisible();
 				}
 			});
 		}

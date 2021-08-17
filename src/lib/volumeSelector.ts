@@ -1,7 +1,11 @@
 import { Color3, MeshBuilder, StandardMaterial, Vector3 } from '$lib/utils/babylon';
 import type EpiDataModule from './epiData';
 import type StructureModule from './structure';
-import { Logger } from './utils/utils';
+import { EventSrc, Logger } from './utils/utils';
+
+interface VolumeSelectorEvents {
+	PARAMS_CHANGE: RecursivePartial<VolSelectParams>;
+}
 
 /** Helper type to define what inputs you can pass to updateBound */
 type Bound = 'minX' | 'maxX' | 'minY' | 'maxY' | 'minZ' | 'maxZ';
@@ -10,6 +14,8 @@ type Bound = 'minX' | 'maxX' | 'minY' | 'maxY' | 'minZ' | 'maxZ';
 export default class VolumeSelectorModule {
 	/** Logger module */
 	private logger: Logger;
+
+	public events: EventSrc<VolumeSelectorEvents>;
 
 	/** Whether the user is currently adjusting the selector params */
 	public placingSelector: boolean;
@@ -55,6 +61,7 @@ export default class VolumeSelectorModule {
 	 */
 	constructor(private scene: Scene, private structure: StructureModule, private epiData: EpiDataModule) {
 		this.logger = new Logger('Volume Selector');
+
 		this.placingSelector = false;
 		this.locked = false;
 		this.active = false;
@@ -73,6 +80,8 @@ export default class VolumeSelectorModule {
 		this.maxZ = 1000;
 		this.structCache = {};
 		this.epiDataCache = {};
+		this.events = new EventSrc(['PARAMS_CHANGE']);
+
 		this.logger.log('Initialized');
 	}
 
@@ -88,6 +97,7 @@ export default class VolumeSelectorModule {
 			if (this.placingSelector) {
 				this.updateWalls();
 			}
+			this.events.dispatch('PARAMS_CHANGE', { [bound]: value });
 		}
 	}
 
@@ -143,6 +153,14 @@ export default class VolumeSelectorModule {
 	/** Start the sort (ie. display the guide mesh) */
 	public start(): void {
 		this.placingSelector = true;
+		this.locked = false;
+
+		this.minX = -1000;
+		this.maxX = 1000;
+		this.minY = -1000;
+		this.maxY = 1000;
+		this.minZ = -1000;
+		this.maxZ = 1000;
 
 		// Create one material for all the walls
 		const planeMat = new StandardMaterial('planemat', this.scene);

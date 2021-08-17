@@ -1,10 +1,10 @@
 <script lang="ts">
 	import Button from '$lib/components/Button.svelte';
-	import ControlRequest from '$lib/components/ControlRequest.svelte';
 	import FancyInput from '$lib/components/FancyInput.svelte';
 	import type GameLite from '$lib/game';
 	import { Vector3 } from '$lib/utils/babylon';
 	import type MySocket from '$lib/utils/sock';
+	import { getContext } from 'svelte';
 
 	export let game: GameLite;
 	export let socket: MySocket<SocketReceiveMsgs, SocketSendMsgs>;
@@ -20,8 +20,9 @@
 		controllerId: string | null = null,
 		participants: LiveParticipant[] = [],
 		transferControl: boolean = false,
-		controlRequests: LiveParticipant[] = [],
 		unsub: () => void | null;
+
+	const { pushRequest } = getContext<ControlRequestContext>('CONTROL_REQUEST_CONTEXT');
 
 	$: hasLive = !!liveSession;
 	$: participants = liveSession ? liveSession.participants : [];
@@ -51,19 +52,11 @@
 	socket.on('START_LIVE', ({ data }) => {
 		liveSession = data;
 
-		const { x, y, z } = data.camPos;
-		const { x: rx, y: ry, z: rz } = data.camRot;
-
-		game.camera.position = new Vector3(x, y, z);
-		game.camera.rotation = new Vector3(rx, ry, rz);
-
 		if (data.hostID === socketId) {
 			inSession = true;
 
-			socket.on('REQUEST_CONTROL', ({ id, name }) => {
-				if (!controlRequests.find(({ id: _id }) => _id === id)) {
-					controlRequests = [...controlRequests, { id, name }];
-				}
+			socket.on('REQUEST_CONTROL', (req) => {
+				pushRequest(req);
 			});
 		}
 	});
@@ -126,31 +119,6 @@
 		}
 	});
 
-	socket.on('RADIUS_START', () => {
-		if (inSession && !inControl) {
-			game.radSelect.start(true);
-			game.canvas.dispatchEvent(new Event('dblclick'));
-		}
-	});
-
-	socket.on('RADIUS_PARAM_CHANGE', ({ position, radius }) => {
-		if (inSession && !inControl) {
-			if (position) {
-				const { x, y, z } = game.radSelect.position;
-				game.radSelect.updatePosition({ x, y, z, ...position });
-			}
-			if (radius) {
-				game.radSelect.updateRadius(radius);
-			}
-		}
-	});
-
-	socket.on('RADIUS_SET', () => {
-		if (inSession && !inControl) {
-			game.radSelect.finalize();
-		}
-	});
-
 	socket.on('EXECUTE_SELECTORS', () => {
 		if (inSession && !inControl) {
 			game.executeSearches();
@@ -160,6 +128,12 @@
 	socket.on('CLEAR_SELECTORS', () => {
 		if (inSession && !inControl) {
 			game.reset();
+		}
+	});
+
+	socket.on('RECALL_SORT', ({ sort }) => {
+		if (inSession && !inControl) {
+			game.events.dispatch('RECALL_SORT', sort);
 		}
 	});
 
@@ -182,6 +156,18 @@
 		}
 	});
 
+	game.volSelect.events.on('PARAMS_CHANGE', (params) => {
+		if (inSession && inControl) {
+			socket.send({ type: 'VOLUME_PARAM_CHANGE', ...params });
+		}
+	});
+
+	game.bpsSelect.events.on('PARAMS_CHANGE', (params) => {
+		if (inSession && inControl) {
+			socket.send({ type: 'BPS_PARAM_CHANGE', ...params });
+		}
+	});
+
 	game.events.on('ACTIVE', () => {
 		if (inSession && inControl) {
 			socket.send({ type: 'EXECUTE_SELECTORS' });
@@ -195,7 +181,7 @@
 	});
 
 	game.events.on('SELECT_FEATURE', (selectedFeature: EpiDataFeature) => {
-		if (inSession && controllerId === socketId) {
+		if (inSession && inControl) {
 			socket.send({
 				type: 'SELECT_MESH',
 				mesh: selectedFeature.mesh.name
@@ -204,10 +190,19 @@
 	});
 
 	game.events.on('SELECT_HIGHLIGHT', (selectedHighlight: RawHighlight) => {
-		if (inSession && controllerId === socketId) {
+		if (inSession && inControl) {
 			socket.send({
 				type: 'SELECT_MESH',
 				mesh: `highlight-${selectedHighlight.id}`
+			});
+		}
+	});
+
+	game.events.on('RECALL_SORT', (sort) => {
+		if (inSession && inControl) {
+			socket.send({
+				type: 'RECALL_SORT',
+				sort
 			});
 		}
 	});
@@ -310,22 +305,6 @@
 			{/if}
 		</div>
 	{/if}
-	{#if hostId === socketId}
-		<div class="req-container">
-			{#each controlRequests as req}
-				<ControlRequest
-					{req}
-					accept={() => {
-						socket.send({ type: 'TRANSFER_CONTROL', id: req.id });
-						controlRequests = controlRequests.filter((r) => r.id !== req.id);
-					}}
-					deny={() => {
-						controlRequests = controlRequests.filter((r) => r.id !== req.id);
-					}}
-				/>
-			{/each}
-		</div>
-	{/if}
 </div>
 
 <style>
@@ -373,14 +352,6 @@
 	}
 
 	.btns {
-		display: flex;
-		flex-direction: column;
-	}
-
-	.req-container {
-		position: fixed;
-		top: 0;
-		right: 0;
 		display: flex;
 		flex-direction: column;
 	}

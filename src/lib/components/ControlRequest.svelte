@@ -11,7 +11,7 @@
 	onMount(() => {
 		setTimeout(() => {
 			mounted = true;
-		}, 0);
+		}, 50);
 	});
 </script>
 
@@ -32,7 +32,7 @@
 		background: rgba(0, 0, 0, 0);
 		padding: 0.25em 0.5em;
 		transition: all linear 0.25s;
-		transform: translateX(100%);
+		transform: translateX(-100%);
 	}
 
 	.main.mounted {

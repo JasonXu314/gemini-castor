@@ -7,6 +7,8 @@
 	export let game: GameLite;
 	export let recallSort: (sort: Sort) => void;
 	export let closed: boolean;
+	export let inSession: boolean;
+	export let inControl: boolean;
 
 	const { deleteSort, renameSort } = getContext<HistoryContext>('HISTORY_CONTEXT');
 
@@ -17,7 +19,13 @@
 
 <div class="console" class:hidden={closed}>
 	{#each sortHist as sort}
-		<PastSort {sort} disabled={game.sortsActive} on:blur={() => renameSort(sort)} recall={() => recallSort(sort)} del={() => deleteSort(sort)} />
+		<PastSort
+			{sort}
+			disabled={game.sortsActive || (inSession && !inControl)}
+			on:blur={() => renameSort(sort)}
+			recall={() => recallSort(sort)}
+			del={() => deleteSort(sort)}
+		/>
 	{/each}
 </div>
 

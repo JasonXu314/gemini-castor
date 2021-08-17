@@ -27,8 +27,8 @@
 	<div class="content">
 		<GeneralMenu {game} closed={openMenu !== 0} />
 		<RadiusSelectMenu {game} closed={openMenu !== 1} {inSession} {inControl} {socket} />
-		<VolumeSelectMenu {game} closed={openMenu !== 2} {inSession} {inControl} />
-		<BasePairSelectMenu {game} closed={openMenu !== 3} {inSession} {inControl} />
+		<VolumeSelectMenu {game} closed={openMenu !== 2} {inSession} {inControl} {socket} />
+		<BasePairSelectMenu {game} closed={openMenu !== 3} {inSession} {inControl} {socket} />
 	</div>
 	<div class="btns">
 		<Button

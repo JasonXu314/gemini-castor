@@ -57,6 +57,51 @@
 		}
 	}
 
+	socket.on('RADIUS_START', () => {
+		if (inSession && !inControl) {
+			game.radSelect.start(true);
+			game.canvas.dispatchEvent(new Event('dblclick'));
+			initPos = false;
+			settingParams = true;
+			initPos = true;
+			setTimeout(() => {
+				game.canvas.focus();
+			}, 0);
+		}
+	});
+
+	socket.on('RADIUS_PARAM_CHANGE', ({ position, radius: _radius }) => {
+		if (inSession && !inControl) {
+			if (position) {
+				const { x: _x, y: _y, z: _z } = position;
+				if (_x !== undefined) x = _x;
+				if (_y !== undefined) y = _y;
+				if (_z !== undefined) z = _z;
+			}
+			if (_radius !== undefined) {
+				radius = _radius;
+			}
+		}
+	});
+
+	socket.on('RADIUS_SET', () => {
+		if (inSession && !inControl) {
+			finalize();
+		}
+	});
+
+	socket.on('RADIUS_RESET', () => {
+		if (inSession && !inControl) {
+			reset();
+		}
+	});
+
+	socket.on('RADIUS_CANCEL', () => {
+		if (inSession && !inControl) {
+			cancel();
+		}
+	});
+
 	function resetParams() {
 		initPos = false;
 		settingParams = false;
@@ -124,6 +169,9 @@
 			x = 0;
 			y = 0;
 			z = 0;
+			if (inSession && inControl) {
+				socket.send({ type: 'RADIUS_CANCEL' });
+			}
 		}
 	}
 

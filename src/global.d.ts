@@ -50,9 +50,19 @@ type SocketReceiveMsgs = {
 	RADIUS_START: { type: 'RADIUS_START' };
 	RADIUS_PARAM_CHANGE: { type: 'RADIUS_PARAM_CHANGE' } & RecursivePartial<RadSelectParams>;
 	RADIUS_SET: { type: 'RADIUS_SET' };
+	RADIUS_CANCEL: { type: 'RADIUS_CANCEL' };
 	RADIUS_RESET: { type: 'RADIUS_RESET' };
+	VOLUME_START: { type: 'VOLUME_START' };
+	VOLUME_PARAM_CHANGE: { type: 'VOLUME_PARAM_CHANGE' } & RecursivePartial<VolSelectParams>;
+	VOLUME_SET: { type: 'VOLUME_SET' };
+	VOLUME_CANCEL: { type: 'VOLUME_CANCEL' };
+	VOLUME_RESET: { type: 'VOLUME_RESET' };
+	BPS_PARAM_CHANGE: { type: 'BPS_PARAM_CHANGE' } & RecursivePartial<BPSParams>;
+	BPS_SET: { type: 'BPS_SET' };
+	BPS_RESET: { type: 'BPS_RESET' };
 	EXECUTE_SELECTORS: { type: 'EXECUTE_SELECTORS' };
 	CLEAR_SELECTORS: { type: 'CLEAR_SELECTORS' };
+	RECALL_SORT: { type: 'RECALL_SORT'; sort: Sort };
 };
 
 type SocketSendMsgs = {
@@ -69,9 +79,19 @@ type SocketSendMsgs = {
 	RADIUS_START: { type: 'RADIUS_START' };
 	RADIUS_PARAM_CHANGE: { type: 'RADIUS_PARAM_CHANGE' } & RecursivePartial<RadSelectParams>;
 	RADIUS_SET: { type: 'RADIUS_SET' };
+	RADIUS_CANCEL: { type: 'RADIUS_CANCEL' };
 	RADIUS_RESET: { type: 'RADIUS_RESET' };
+	VOLUME_START: { type: 'VOLUME_START' };
+	VOLUME_PARAM_CHANGE: { type: 'VOLUME_PARAM_CHANGE' } & RecursivePartial<VolSelectParams>;
+	VOLUME_SET: { type: 'VOLUME_SET' };
+	VOLUME_CANCEL: { type: 'VOLUME_CANCEL' };
+	VOLUME_RESET: { type: 'VOLUME_RESET' };
+	BPS_PARAM_CHANGE: { type: 'BPS_PARAM_CHANGE' } & RecursivePartial<BPSParams>;
+	BPS_SET: { type: 'BPS_SET' };
+	BPS_RESET: { type: 'BPS_RESET' };
 	EXECUTE_SELECTORS: { type: 'EXECUTE_SELECTORS' };
 	CLEAR_SELECTORS: { type: 'CLEAR_SELECTORS' };
+	RECALL_SORT: { type: 'RECALL_SORT'; sort: Sort };
 };
 
 type RecursivePartial<T> = { [K in keyof T]?: RecursivePartial<T[K]> };
@@ -304,6 +324,10 @@ interface HistoryContext {
 interface ViewContext {
 	renameView: (view: View) => void;
 	deleteView: (view: View) => void;
+}
+
+interface ControlRequestContext {
+	pushRequest: (req: { id; name }) => void;
 }
 
 interface LiveParticipant {

@@ -2,6 +2,7 @@
 	import { page } from '$app/stores';
 	import Button from '$lib/components/Button.svelte';
 	import Console from '$lib/components/console/Console.svelte';
+	import ControlRequest from '$lib/components/ControlRequest.svelte';
 	import FancyInput from '$lib/components/FancyInput.svelte';
 	import GameLite from '$lib/game';
 	import { BACKEND_URL } from '$lib/utils/constants';
@@ -22,6 +23,7 @@
 		socketId: string,
 		socket: MySocket<SocketReceiveMsgs, SocketSendMsgs>,
 		liveSession: LiveSessionData | null = null,
+		controlRequests: LiveParticipant[] = [],
 		askLive: boolean = false,
 		liveName: string,
 		rejectLive: () => void,
@@ -53,6 +55,14 @@
 			axios
 				.delete<View[]>(`${BACKEND_URL}/views`, { data: { id, _id, name } })
 				.catch(() => alert('Failed to delete view'));
+		}
+	});
+
+	setContext<ControlRequestContext>('CONTROL_REQUEST_CONTEXT', {
+		pushRequest: ({ id, name }) => {
+			if (!controlRequests.find(({ id: _id }) => _id === id)) {
+				controlRequests = [...controlRequests, { id, name }];
+			}
 		}
 	});
 
@@ -156,7 +166,16 @@
 						'RADIUS_START',
 						'RADIUS_PARAM_CHANGE',
 						'RADIUS_SET',
+						'RADIUS_CANCEL',
 						'RADIUS_RESET',
+						'VOLUME_START',
+						'VOLUME_PARAM_CHANGE',
+						'VOLUME_SET',
+						'VOLUME_CANCEL',
+						'VOLUME_RESET',
+						'BPS_PARAM_CHANGE',
+						'BPS_SET',
+						'BPS_RESET',
 						'EXECUTE_SELECTORS'
 					]);
 
@@ -353,6 +372,20 @@
 			}}
 		/>
 	{/if}
+	<div class="req-container">
+		{#each controlRequests as req}
+			<ControlRequest
+				{req}
+				accept={() => {
+					socket.send({ type: 'TRANSFER_CONTROL', id: req.id });
+					controlRequests = controlRequests.filter((r) => r.id !== req.id);
+				}}
+				deny={() => {
+					controlRequests = controlRequests.filter((r) => r.id !== req.id);
+				}}
+			/>
+		{/each}
+	</div>
 </div>
 
 <style>
@@ -402,5 +435,13 @@
 
 	.live-menu .button-row {
 		margin-top: 0.5em;
+	}
+
+	.req-container {
+		position: absolute;
+		top: 0;
+		left: 0;
+		display: flex;
+		flex-direction: column;
 	}
 </style>

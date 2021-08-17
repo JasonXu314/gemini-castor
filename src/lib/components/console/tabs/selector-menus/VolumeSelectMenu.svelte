@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type GameLite from '$lib/game';
+	import type MySocket from '$lib/utils/sock';
 	import Button from '../../../Button.svelte';
 	import Slider from '../../../Slider.svelte';
 
@@ -7,6 +8,7 @@
 	export let closed: boolean;
 	export let inSession: boolean;
 	export let inControl: boolean;
+	export let socket: MySocket<SocketReceiveMsgs, SocketSendMsgs>;
 
 	let maxX: number = 1000,
 		minX: number = -1000,
@@ -70,6 +72,44 @@
 		}
 	}
 
+	socket.on(
+		'VOLUME_PARAM_CHANGE',
+		({ maxX: _maxX, maxY: _maxY, maxZ: _maxZ, minX: _minX, minY: _minY, minZ: _minZ }) => {
+			if (inSession && !inControl) {
+				if (_maxX !== undefined) maxX = _maxX;
+				if (_maxY !== undefined) maxY = _maxY;
+				if (_maxZ !== undefined) maxZ = _maxZ;
+				if (_minX !== undefined) minX = _minX;
+				if (_minY !== undefined) minY = _minY;
+				if (_minZ !== undefined) minZ = _minZ;
+			}
+		}
+	);
+
+	socket.on('VOLUME_START', () => {
+		if (inSession && !inControl) {
+			start();
+		}
+	});
+
+	socket.on('VOLUME_SET', () => {
+		if (inSession && !inControl) {
+			finalize();
+		}
+	});
+
+	socket.on('VOLUME_RESET', () => {
+		if (inSession && !inControl) {
+			reset();
+		}
+	});
+
+	socket.on('VOLUME_CANCEL', () => {
+		if (inSession && !inControl) {
+			cancel();
+		}
+	});
+
 	function resetParams() {
 		maxX = 1000;
 		maxY = 1000;
@@ -85,6 +125,9 @@
 	function search() {
 		if (game && set) {
 			game.executeSearches();
+			if (inSession && inControl) {
+				socket.send({ type: 'EXECUTE_SELECTORS' });
+			}
 		}
 	}
 
@@ -92,11 +135,9 @@
 		if (!selecting && !set && game && !game.volSelect.active) {
 			game.volSelect.start();
 			selecting = true;
-		} else if (set && !game.volSelect.active) {
-			game.volSelect.reset();
-			game.volSelect.start();
-			selecting = true;
-			set = false;
+			if (inSession && inControl) {
+				socket.send({ type: 'VOLUME_START' });
+			}
 		}
 	}
 
@@ -105,6 +146,9 @@
 			game.volSelect.finalize();
 			set = true;
 			selecting = false;
+			if (inSession && inControl) {
+				socket.send({ type: 'VOLUME_SET' });
+			}
 		}
 	}
 
@@ -112,12 +156,18 @@
 		if (game.volSelect.placingSelector) {
 			game.volSelect.cancel();
 			resetParams();
+			if (inSession && inControl) {
+				socket.send({ type: 'VOLUME_CANCEL' });
+			}
 		}
 	}
 
 	function reset() {
 		if (game.volSelect.locked && !game.volSelect.active) {
 			game.volSelect.reset();
+			if (inSession && inControl) {
+				socket.send({ type: 'VOLUME_RESET' });
+			}
 		}
 	}
 </script>

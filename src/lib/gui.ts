@@ -105,6 +105,16 @@ export default class GUIModule {
 		}
 	}
 
+	public checkVisible(): void {
+		this.annotations.forEach((rect, mesh) => {
+			if (!mesh.isEnabled() && this.isEnabled(rect)) {
+				this.disableAnnotation(mesh);
+			} else if (mesh.isEnabled() && !this.isEnabled(rect)) {
+				this.enableAnnotation(mesh);
+			}
+		});
+	}
+
 	public enableAnnotation(mesh: AbstractMesh): void {
 		const rect = this.annotations.get(mesh);
 
@@ -123,5 +133,9 @@ export default class GUIModule {
 
 	public hasAnnotation(mesh: AbstractMesh): boolean {
 		return this.annotations.has(mesh);
+	}
+
+	public isEnabled(ann: Rectangle): boolean {
+		return ann.isVisible;
 	}
 }

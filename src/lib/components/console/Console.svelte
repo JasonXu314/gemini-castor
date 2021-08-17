@@ -61,7 +61,7 @@
 		<GeneralInfo closed={tabNum !== 0} {game} />
 		<Selectors closed={tabNum !== 1} {game} {inSession} {inControl} {socket} />
 		<RegionHighlights closed={tabNum !== 2} {game} />
-		<SortHistory closed={tabNum !== 3} {recallSort} {game} />
+		<SortHistory closed={tabNum !== 3} {recallSort} {game} {inSession} {inControl} />
 		<ViewHistory closed={tabNum !== 4} {recallView} {game} />
 		<LiveSession closed={tabNum !== 5} {game} {socket} {socketId} {liveSession} bind:inSession bind:inControl />
 	</div>

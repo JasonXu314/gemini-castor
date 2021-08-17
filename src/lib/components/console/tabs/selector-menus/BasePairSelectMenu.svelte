@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type GameLite from '$lib/game';
+	import type MySocket from '$lib/utils/sock';
 	import Button from '../../../Button.svelte';
 	import FancyInput from '../../../FancyInput.svelte';
 	import Slider from '../../../Slider.svelte';
@@ -8,6 +9,7 @@
 	export let closed: boolean;
 	export let inSession: boolean;
 	export let inControl: boolean;
+	export let socket: MySocket<SocketReceiveMsgs, SocketSendMsgs>;
 
 	let regions: string = '',
 		radius: number = 500,
@@ -34,6 +36,25 @@
 			});
 		}
 	}
+
+	socket.on('BPS_PARAM_CHANGE', ({ regions: _regions, radius: _radius }) => {
+		if (inSession && !inControl) {
+			if (_regions !== undefined) regions = _regions;
+			if (_radius !== undefined) radius = _radius;
+		}
+	});
+
+	socket.on('BPS_SET', () => {
+		if (inSession && !inControl) {
+			set();
+		}
+	});
+
+	socket.on('BPS_RESET', () => {
+		if (inSession && !inControl) {
+			resetParams();
+		}
+	});
 
 	function resetParams() {
 		regions = '';

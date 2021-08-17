@@ -2,12 +2,18 @@ import type { Scene } from 'babylonjs';
 import type EpiDataModule from './epiData';
 import type RadiusSelectorModule from './radiusSelector';
 import type StructureModule from './structure';
-import { Logger } from './utils/utils';
+import { EventSrc, Logger } from './utils/utils';
+
+interface BasePairSelectorEvents {
+	PARAMS_CHANGE: RecursivePartial<BPSParams>;
+}
 
 /** Class to handle all operations regarding the base pair selector */
 export default class BasePairSelectorModule {
 	/** Logger module */
 	private logger: Logger;
+
+	public events: EventSrc<BasePairSelectorEvents>;
 
 	/** Caches of results, for faster recollection */
 	private structCache: Record<string, RawStructureCoord[]>;
@@ -44,12 +50,16 @@ export default class BasePairSelectorModule {
 		public viewRegion: ViewRegion
 	) {
 		this.logger = new Logger('BPS');
+
 		this.regions = null;
 		this.radius = 500;
 		this.locked = false;
 		this.active = false;
 		this.structCache = {};
 		this.epiDataCache = {};
+
+		this.events = new EventSrc(['PARAMS_CHANGE']);
+
 		this.logger.log('Initialized');
 	}
 
@@ -60,6 +70,7 @@ export default class BasePairSelectorModule {
 	public updateRadius(rad: number): void {
 		if (!this.locked && !this.active) {
 			this.radius = rad;
+			this.events.dispatch('PARAMS_CHANGE', { radius: rad });
 		}
 	}
 
@@ -67,6 +78,7 @@ export default class BasePairSelectorModule {
 		if (!this.locked && !this.active) {
 			if (/^(chr\d{1,2}:\d+-\d+;)*chr\d{1,2}:\d+-\d+$/.test(reg)) {
 				this.regions = reg;
+				this.events.dispatch('PARAMS_CHANGE', { regions: reg });
 			} else {
 				throw new Error('Parameter is not a valid chromosome selection region!');
 			}
@@ -100,8 +112,12 @@ export default class BasePairSelectorModule {
 		// Iterate over each segment
 		bounds.forEach(({ start, stop }) => {
 			// Find structure Indices
-			const startTag = Math.round(((start - this.viewRegion.start) / this.viewRegion.length) * this.structure.data.length),
-				stopTag = Math.round(((stop - this.viewRegion.start) / this.viewRegion.length) * this.structure.data.length),
+			const startTag = Math.round(
+					((start - this.viewRegion.start) / this.viewRegion.length) * this.structure.data.length
+				),
+				stopTag = Math.round(
+					((stop - this.viewRegion.start) / this.viewRegion.length) * this.structure.data.length
+				),
 				// Find the structure coordinates of the segment
 				segCoords: RawStructureCoord[] =
 					startTag > stopTag
@@ -168,8 +184,12 @@ export default class BasePairSelectorModule {
 
 		bounds.forEach(({ start, stop }) => {
 			// Find structure Indices
-			const startTag = Math.round(((start - this.viewRegion.start) / this.viewRegion.length) * this.structure.data.length),
-				stopTag = Math.round(((stop - this.viewRegion.start) / this.viewRegion.length) * this.structure.data.length),
+			const startTag = Math.round(
+					((start - this.viewRegion.start) / this.viewRegion.length) * this.structure.data.length
+				),
+				stopTag = Math.round(
+					((stop - this.viewRegion.start) / this.viewRegion.length) * this.structure.data.length
+				),
 				// Find the structure coordinates of the segment
 				segCoords: RawStructureCoord[] =
 					startTag > stopTag
