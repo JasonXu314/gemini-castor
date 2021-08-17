@@ -34,9 +34,13 @@
 
 	setContext<HistoryContext>('HISTORY_CONTEXT', {
 		renameSort: ({ _id, name }: Sort) => {
-			axios
-				.patch<Sort[]>(`${BACKEND_URL}/history`, { id, _id, name })
-				.catch(() => alert('Failed to rename sort; name will be lost on refresh'));
+			if (name.trim().length > 0) {
+				axios
+					.patch<Sort[]>(`${BACKEND_URL}/history`, { id, _id, name: name.trim() })
+					.catch(() => alert('Failed to rename sort; name will be lost on refresh'));
+			} else {
+				throw new Error('Sort name must not be empty!');
+			}
 		},
 		deleteSort: ({ _id, name }: Sort) => {
 			axios
@@ -47,9 +51,13 @@
 
 	setContext<ViewContext>('VIEW_CONTEXT', {
 		renameView: ({ _id, name }: View) => {
-			axios
-				.patch<View[]>(`${BACKEND_URL}/views`, { id, _id, name })
-				.catch(() => alert('Failed to rename view; name will be lost on refresh'));
+			if (name.trim().length > 0) {
+				axios
+					.patch<View[]>(`${BACKEND_URL}/views`, { id, _id, name })
+					.catch(() => alert('Failed to rename view; name will be lost on refresh'));
+			} else {
+				throw new Error('View name must not be empty!');
+			}
 		},
 		deleteView: ({ _id, name }: View) => {
 			axios
@@ -218,7 +226,11 @@
 						}
 					});
 
-					mainSock.on('VIEW_ADD', ({ newView }) => viewStore.update((prevViews) => [...prevViews, newView]));
+					mainSock.on('VIEW_ADD', ({ newView }) =>
+						viewStore.update((prevViews) =>
+							prevViews.find((elem) => elem._id === newView._id) ? prevViews : [...prevViews, newView]
+						)
+					);
 					mainSock.on('VIEW_DEL', ({ id }) =>
 						viewStore.update((prevViews) => prevViews.filter((view) => view._id !== id))
 					);

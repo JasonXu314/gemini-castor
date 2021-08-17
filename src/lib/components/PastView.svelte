@@ -5,10 +5,24 @@
 	export let recall: () => void;
 	export let del: () => void;
 	export let disabled: boolean;
+	export let rename: (newName: string) => void;
+
+	let eagerName: string | null = view.name;
 </script>
 
 <div class="main">
-	<input class="subtle-input" type="text" on:blur bind:value={view.name} />
+	<input
+		class="subtle-input"
+		type="text"
+		on:blur={() => {
+			try {
+				rename(eagerName);
+			} catch (err) {
+				eagerName = view.name;
+			}
+		}}
+		bind:value={eagerName}
+	/>
 	<span>
 		<h4>Position:</h4>
 		({view.pos.x.toFixed(2)}, {view.pos.y.toFixed(2)}, {view.pos.z.toFixed(2)})

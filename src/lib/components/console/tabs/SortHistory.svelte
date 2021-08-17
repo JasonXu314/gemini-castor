@@ -15,14 +15,31 @@
 	let sortHist: Sort[];
 
 	historyStore.subscribe((val) => (sortHist = val));
+
+	type ScrollEvent = WheelEvent & {
+		currentTarget: EventTarget & HTMLDivElement;
+	};
+
+	function scroll(evt: ScrollEvent) {
+		if (evt.deltaY !== 0 && evt.deltaX === 0 && !evt.shiftKey) {
+			evt.currentTarget.scrollBy({ left: evt.deltaY });
+		}
+	}
 </script>
 
-<div class="console" class:hidden={closed}>
+<div class="console" class:hidden={closed} on:wheel={scroll}>
 	{#each sortHist as sort}
 		<PastSort
 			{sort}
 			disabled={game.sortsActive || (inSession && !inControl)}
-			on:blur={() => renameSort(sort)}
+			rename={(newName) => {
+				try {
+					renameSort({ ...sort, name: newName });
+				} catch (err) {
+					alert(err.message);
+					throw new Error();
+				}
+			}}
 			recall={() => recallSort(sort)}
 			del={() => deleteSort(sort)}
 		/>

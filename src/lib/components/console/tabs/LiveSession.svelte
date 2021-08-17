@@ -20,6 +20,7 @@
 		controllerId: string | null = null,
 		participants: LiveParticipant[] = [],
 		transferControl: boolean = false,
+		errMsg: string | null = null,
 		unsub: () => void | null;
 
 	const { pushRequest } = getContext<ControlRequestContext>('CONTROL_REQUEST_CONTEXT');
@@ -222,8 +223,11 @@
 							type: 'START_LIVE',
 							camPos: { x, y, z },
 							camRot: { x: rx, y: ry, z: rz },
-							name
+							name: name.trim()
 						});
+						errMsg = null;
+					} else {
+						errMsg = 'Name must not be empty!';
 					}
 				} else {
 					if (inSession) {
@@ -236,8 +240,11 @@
 						if (name.trim().length > 0) {
 							socket.send({
 								type: 'JOIN_LIVE',
-								name
+								name: name.trim()
 							});
+							errMsg = null;
+						} else {
+							errMsg = 'Name must not be empty!';
 						}
 					}
 				}
@@ -251,6 +258,9 @@
 				: 'Create Live Session'}</Button
 		>
 		<FancyInput dark disabled={inSession} id="name" label="Name" bind:value={name} />
+		{#if errMsg}
+			<div class="err">{errMsg}</div>
+		{/if}
 	</div>
 	<div class="participants">
 		{#each participants as participant}
@@ -354,5 +364,9 @@
 	.btns {
 		display: flex;
 		flex-direction: column;
+	}
+
+	.err {
+		color: red;
 	}
 </style>

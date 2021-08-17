@@ -16,7 +16,8 @@
 	const { renameView, deleteView } = getContext<ViewContext>('VIEW_CONTEXT');
 
 	let viewHist: View[] = [],
-		viewName: string = `View ${viewHist.length + 1}`;
+		viewName: string = `View ${viewHist.length + 1}`,
+		errMsg: string | null = null;
 
 	viewStore.subscribe((val) => (viewHist = val));
 
@@ -27,14 +28,19 @@
 	}
 
 	function saveView() {
-		const { x, y, z } = game.camera.position;
-		const { x: rx, y: ry, z: rz } = game.camera.rotation;
-		const view = { _id: uuid(), name: viewName, pos: { x, y, z }, rot: { x: rx, y: ry, z: rz } };
-		axios.post<View[]>(`${BACKEND_URL}/views`, {
-			id: game.rawData.id,
-			view
-		});
-		viewStore.update((prevViews) => [...prevViews, view]);
+		if (viewName.trim().length > 0) {
+			const { x, y, z } = game.camera.position;
+			const { x: rx, y: ry, z: rz } = game.camera.rotation;
+			const view = { _id: uuid(), name: viewName.trim(), pos: { x, y, z }, rot: { x: rx, y: ry, z: rz } };
+			axios.post<View[]>(`${BACKEND_URL}/views`, {
+				id: game.rawData.id,
+				view
+			});
+			viewStore.update((prevViews) => [...prevViews, view]);
+			errMsg = null;
+		} else {
+			errMsg = 'View name must not be empty!';
+		}
 	}
 
 	type ScrollEvent = WheelEvent & {
@@ -42,7 +48,7 @@
 	};
 
 	function scroll(evt: ScrollEvent) {
-		if (evt.deltaY !== 0 && evt.deltaX === 0) {
+		if (evt.deltaY !== 0 && evt.deltaX === 0 && !evt.shiftKey) {
 			evt.currentTarget.scrollBy({ left: evt.deltaY });
 		}
 	}
@@ -52,9 +58,26 @@
 	<div class="controls">
 		<FancyInput id="view-name" label="View Name" bind:value={viewName} dark />
 		<Button on:click={saveView} type="action">Save View</Button>
+		{#if errMsg}
+			<div class="err">{errMsg}</div>
+		{/if}
 	</div>
 	{#each viewHist as view}
-		<PastView {view} disabled={game.sortsActive} on:blur={() => renameView(view)} recall={() => recallView(view)} del={() => deleteView(view)} />
+		<PastView
+			{view}
+			disabled={game.sortsActive}
+			rename={(newName) => {
+				try {
+					renameView({ ...view, name: newName });
+					errMsg = null;
+				} catch (err) {
+					errMsg = err.message;
+					throw new Error();
+				}
+			}}
+			recall={() => recallView(view)}
+			del={() => deleteView(view)}
+		/>
 	{/each}
 </div>
 
@@ -78,5 +101,9 @@
 
 	.console .controls {
 		margin-right: 1em;
+	}
+
+	.err {
+		color: red;
 	}
 </style>
