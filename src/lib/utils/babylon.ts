@@ -1,5 +1,6 @@
 // import {
 // 	AbstractMesh,
+// 	ArcRotateCamera,
 // 	Color3,
 // 	Color4,
 // 	Engine,
@@ -37,7 +38,8 @@ const {
 	StandardMaterial,
 	UniversalCamera,
 	Vector3,
-	VertexData
+	VertexData,
+	ArcRotateCamera
 } = pkg;
 const { AdvancedDynamicTexture, Rectangle, TextBlock } = gui;
 
@@ -61,5 +63,6 @@ export {
 	VertexData,
 	AdvancedDynamicTexture,
 	Rectangle,
-	TextBlock
+	TextBlock,
+	ArcRotateCamera
 };

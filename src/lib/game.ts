@@ -1,4 +1,5 @@
 import {
+	ArcRotateCamera,
 	Color3,
 	Engine,
 	HemisphericLight,
@@ -68,10 +69,12 @@ export default class GameLite {
 	private prevCamRot: Vector3;
 
 	public scene: Scene;
-	public camera: UniversalCamera;
+	public camera: ArcRotateCamera | UniversalCamera;
 	public light: HemisphericLight;
 	public running: boolean;
 	public sortsActive: boolean;
+	private arcCam: ArcRotateCamera;
+	private uniCam: UniversalCamera;
 
 	// Modules
 	public gui: GUIModule;
@@ -141,19 +144,25 @@ export default class GameLite {
 		// Set up camera + light
 		this.light = new HemisphericLight('light', new Vector3(0, 1, 0), this.scene);
 		this.light.specular = Color3.White();
-		this.camera = new UniversalCamera('unicam', new Vector3(0, 0, 10000), this.scene);
-		this.camera.setTarget(new Vector3(0, 0, 0));
-		this.camera.maxZ = 20000;
-		this.camera.keysUp[0] = 87;
-		this.camera.keysDown[0] = 83;
-		this.camera.keysLeft[0] = 65;
-		this.camera.keysRight[0] = 68;
-		this.camera.keysUpward[0] = 32;
-		this.camera.keysDownward[0] = 16;
-		this.camera.speed = 500;
-		this.camera.angularSensibility = 200;
-		this.camera.attachControl(false);
-		this.camera.inertia = 0.75;
+		this.uniCam = new UniversalCamera('unicam', new Vector3(0, 0, 10000), this.scene);
+		this.uniCam.setTarget(new Vector3(0, 0, 0));
+		this.uniCam.maxZ = 20000;
+		this.uniCam.keysUp[0] = 87;
+		this.uniCam.keysDown[0] = 83;
+		this.uniCam.keysLeft[0] = 65;
+		this.uniCam.keysRight[0] = 68;
+		this.uniCam.keysUpward[0] = 32;
+		this.uniCam.keysDownward[0] = 16;
+		this.uniCam.speed = 500;
+		this.uniCam.angularSensibility = 200;
+		this.uniCam.attachControl(false);
+		this.uniCam.inertia = 0.75;
+		this.arcCam = new ArcRotateCamera('arccam', 0, 0, 10000, new Vector3(0, 0, 0), this.scene);
+		this.arcCam.speed = 500;
+		this.arcCam.angularSensibilityX = 200;
+		this.arcCam.angularSensibilityY = 200;
+		this.arcCam.inertia = 0.75;
+		this.camera = this.uniCam;
 		this.hoverMesh = null;
 		this.originalColor = null;
 
@@ -714,5 +723,22 @@ export default class GameLite {
 				reject();
 			});
 		});
+	}
+
+	public setCam(cam: 'uni' | 'arc'): void {
+		if (cam === 'uni') {
+			this.uniCam.position = this.arcCam.position.clone();
+			this.uniCam.setTarget(new Vector3(0, 0, 0));
+			this.arcCam.detachControl();
+			this.uniCam.attachControl(false);
+			this.camera = this.uniCam;
+			this.scene.activeCamera = this.uniCam;
+		} else {
+			this.arcCam.position = this.uniCam.position.clone();
+			this.uniCam.detachControl();
+			this.arcCam.attachControl(false);
+			this.camera = this.arcCam;
+			this.scene.activeCamera = this.arcCam;
+		}
 	}
 }

@@ -20,7 +20,8 @@
 
 	let collapsed: boolean = false,
 		tabNum: number = 0,
-		background = STEEL;
+		background = STEEL,
+		camera: 'uni' | 'arc' = 'uni';
 
 	function recallSort(sort: Sort) {
 		tabNum = 1;
@@ -42,8 +43,10 @@
 		game.zAxis.color = background === STEEL ? LINE_WHITE : LINE_BLACK;
 	}
 
-	$: console.log('In session changed', inSession);
-	$: console.log('In control changed', inControl);
+	function toggleCamera() {
+		camera = camera === 'uni' ? 'arc' : 'uni';
+		game.setCam(camera);
+	}
 </script>
 
 <div class="main" class:collapsed>
@@ -56,6 +59,9 @@
 		<Button type="tab" on:click={() => (tabNum = 4)}>Views</Button>
 		<Button type="tab" on:click={() => (tabNum = 5)}>Live Session</Button>
 		<Button type="tab" on:click={toggleBackground}>BG: {background === STEEL ? 'steel' : 'white'}</Button>
+		<Button type="tab" on:click={toggleCamera}
+			>Cam: {camera === 'arc' ? 'Arc Rotate Camera' : 'Universal Camera'}</Button
+		>
 	</div>
 	<div class="body" class:hidden={collapsed}>
 		<GeneralInfo closed={tabNum !== 0} {game} />
