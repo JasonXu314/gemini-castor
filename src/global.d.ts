@@ -6,6 +6,7 @@ type LinesMesh = import('babylonjs').LinesMesh;
 type SceneOptimizer = import('babylonjs').SceneOptimizer;
 type Scene = import('babylonjs').Scene;
 type UniversalCamera = import('babylonjs').UniversalCamera;
+type ArcRotateCamera = import('babylonjs').ArcRotateCamera;
 type HemisphericLight = import('babylonjs').HemisphericLight;
 type AbstractMesh = import('babylonjs').AbstractMesh;
 type StandardMaterial = import('babylonjs').StandardMaterial;
