@@ -34,6 +34,7 @@ type SocketReceiveMsgs = {
 	HIGHLIGHT_ADD: { type: 'HIGHLIGHT_ADD'; newHighlight: RawHighlight };
 	HIGHLIGHT_DEL: { type: 'HIGHLIGHT_DEL'; id: string };
 	HIGHLIGHT_EDIT: { type: 'HIGHLIGHT_EDIT'; id: string; name: string };
+	HIGHLIGHT_COLOR: { type: 'HIGHLIGHT_COLOR'; id: string; color: RawColor3 };
 	VIEW_ADD: { type: 'VIEW_ADD'; newView: View };
 	VIEW_DEL: { type: 'VIEW_DEL'; id: string };
 	VIEW_EDIT: { type: 'VIEW_EDIT'; id: string; name: string };
@@ -355,6 +356,7 @@ interface RadiusHighlight {
 	name: string;
 	params: RadSelectParams;
 	type: 'radius';
+	color: RawColor3;
 }
 
 interface VolumeHighlight {
@@ -362,4 +364,5 @@ interface VolumeHighlight {
 	name: string;
 	params: VolSelectParams;
 	type: 'volume';
+	color: RawColor3;
 }

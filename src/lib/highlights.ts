@@ -4,7 +4,7 @@ import type GameLite from './game';
 import type GUIModule from './gui';
 import { Color3, MeshBuilder, StandardMaterial, Vector3 } from './utils/babylon';
 import { BACKEND_URL } from './utils/constants';
-import { EventSrc, Logger } from './utils/utils';
+import { EventSrc, Logger, modColor } from './utils/utils';
 
 /** Helper type to define what inputs you can pass to updateBound */
 type Bound = 'minX' | 'maxX' | 'minY' | 'maxY' | 'minZ' | 'maxZ';
@@ -13,6 +13,7 @@ interface HighlightEvents {
 	CREATED_HIGHLIGHT: RawHighlight;
 	EDITED_HIGHLIGHT: { id: string; name: string };
 	DELETED_HIGHLIGHT: RawHighlight;
+	CHANGED_HIGHLIGHT_COLOR: { id: string; color: RawColor3 };
 }
 
 export default class HighlightsModule {
@@ -57,7 +58,12 @@ export default class HighlightsModule {
 	constructor(private gui: GUIModule, private canvas: HTMLCanvasElement, private scene: Scene, private game: GameLite) {
 		this.logger = new Logger('Highlights');
 
-		this.events = new EventSrc<HighlightEvents>(['CREATED_HIGHLIGHT', 'DELETED_HIGHLIGHT', 'EDITED_HIGHLIGHT']);
+		this.events = new EventSrc<HighlightEvents>([
+			'CREATED_HIGHLIGHT',
+			'DELETED_HIGHLIGHT',
+			'EDITED_HIGHLIGHT',
+			'CHANGED_HIGHLIGHT_COLOR'
+		]);
 
 		this.highlightMeshes = new Map();
 		this.highlights = new Map();
@@ -71,6 +77,10 @@ export default class HighlightsModule {
 		this.logger.log('Initialized');
 	}
 
+	/**
+	 * Loads a single raw highlight
+	 * @param highlight the raw highlight to be loaded
+	 */
 	public loadHighlight(highlight: RawHighlight): void {
 		if (!this.highlights.has(highlight.id)) {
 			if (highlight.type === 'radius') {
@@ -78,8 +88,9 @@ export default class HighlightsModule {
 					position: { x, y, z },
 					radius
 				} = highlight.params;
+				const { r, g, b } = highlight.color;
 				const meshMat = new StandardMaterial(`highlight-${highlight.id}-mat`, this.scene);
-				meshMat.diffuseColor = new Color3(0, 0, 1);
+				meshMat.diffuseColor = new Color3(r, g, b);
 				meshMat.alpha = 0.25;
 				meshMat.backFaceCulling = false;
 
@@ -97,8 +108,9 @@ export default class HighlightsModule {
 				this.shown.set(highlight.id, true);
 			} else {
 				const { maxX, maxY, maxZ, minX, minY, minZ } = highlight.params;
+				const { r, g, b } = highlight.color;
 				const meshMat = new StandardMaterial(`highlight-${highlight.id}-mat`, this.scene);
-				meshMat.diffuseColor = new Color3(0, 0, 1);
+				meshMat.diffuseColor = new Color3(r, g, b);
 				meshMat.alpha = 0.25;
 				meshMat.backFaceCulling = false;
 
@@ -119,6 +131,10 @@ export default class HighlightsModule {
 		}
 	}
 
+	/**
+	 * Loads the given raw highlights, generating meshes to display them
+	 * @param highlights the raw highlights to be loaded
+	 */
 	public loadHighlights(highlights: RawHighlight[]): void {
 		highlights.forEach((highlight) => this.loadHighlight(highlight));
 	}
@@ -404,7 +420,8 @@ export default class HighlightsModule {
 				id,
 				name: `Highlight ${this.highlights.size + 1}`,
 				params: { position: { x, y, z }, radius },
-				type: 'radius'
+				type: 'radius',
+				color: { r: 0, g: 0, b: 1 }
 			};
 
 			const meshMat = new StandardMaterial(`highlight-${id}-mat`, this.scene);
@@ -445,7 +462,8 @@ export default class HighlightsModule {
 				id,
 				name: `Highlight ${this.highlights.size + 1}`,
 				params: { maxX, maxY, maxZ, minX, minY, minZ },
-				type: 'volume'
+				type: 'volume',
+				color: { r: 0, g: 0, b: 1 }
 			};
 
 			const meshMat = new StandardMaterial(`highlight-${id}-mat`, this.scene);
@@ -510,6 +528,30 @@ export default class HighlightsModule {
 			if (highlight.name !== name) {
 				highlight.name = name;
 				this.events.dispatch('EDITED_HIGHLIGHT', { id, name });
+			}
+		}
+	}
+
+	public changeHighlightColor(id: string, color: RawColor3): void {
+		if (this.highlights.has(id)) {
+			const highlight = this.highlights.get(id);
+			const { r, g, b } = highlight.color;
+			if (r !== color.r || g !== color.g || b !== color.b) {
+				highlight.color = color;
+				const highlightMesh = this.highlightMeshes.get(id)!;
+				const newColor = new Color3(color.r, color.g, color.b);
+
+				if (this.game.selectedMesh === highlightMesh) {
+					(highlightMesh.material as StandardMaterial).diffuseColor = modColor(newColor);
+					this.game.selectedOriginalColor = newColor;
+				} else if (this.game.hoverMesh === highlightMesh) {
+					(highlightMesh.material as StandardMaterial).diffuseColor = modColor(newColor);
+					this.game.originalColor = newColor;
+				} else {
+					(highlightMesh.material as StandardMaterial).diffuseColor = newColor;
+				}
+
+				this.events.dispatch('CHANGED_HIGHLIGHT_COLOR', { id, color });
 			}
 		}
 	}

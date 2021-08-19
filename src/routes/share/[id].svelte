@@ -161,6 +161,7 @@
 						'HIGHLIGHT_ADD',
 						'HIGHLIGHT_DEL',
 						'HIGHLIGHT_EDIT',
+						'HIGHLIGHT_COLOR',
 						'VIEW_ADD',
 						'VIEW_DEL',
 						'VIEW_EDIT',
@@ -218,6 +219,10 @@
 
 					mainSock.on('HIGHLIGHT_EDIT', ({ id, name }) => {
 						game.highlights.editHighlight(id, name);
+					});
+
+					mainSock.on('HIGHLIGHT_COLOR', ({ id, color }) => {
+						game.highlights.changeHighlightColor(id, color);
 					});
 
 					mainSock.on('HIGHLIGHT_DEL', ({ id }) => {

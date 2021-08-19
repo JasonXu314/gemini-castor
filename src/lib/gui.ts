@@ -34,20 +34,35 @@ export default class GUIModule {
 		this.logger.log('Initialized');
 	}
 
+	/**
+	 * Loads the given raw annotations, creating GUI elements for ones whose meshes are rendered, and storing the rest
+	 * in unloadedAnnotations
+	 * @param annotations the raw annotations to load
+	 */
 	public loadAnnotations(annotations: RawAnnotation[]): void {
 		annotations.forEach((ann) => this.loadAnnotation(ann));
 	}
 
+	/**
+	 * Loads a single raw annotation
+	 * @param annotation the raw annotation to load
+	 */
 	public loadAnnotation(annotation: RawAnnotation): void {
 		const mesh = this.scene.getMeshByName(annotation.mesh);
 
 		if (!mesh) {
 			this.unloadedAnnotations.push(annotation);
 		} else if (!this.hasAnnotation(mesh)) {
+			// store the annotation for later, in case the mesh ever does get rendered
 			this.makeAnnotation(mesh, annotation.text);
 		}
 	}
 
+	/**
+	 * Creates the GUI element for an annotation
+	 * @param mesh the mesh that the annotation is attached to
+	 * @param annotation the text of the annotation
+	 */
 	public makeAnnotation(mesh: AbstractMesh, annotation: string): void {
 		// Make body for the BABYLON gui representation of the annotation
 		const rect = new Rectangle(mesh.name + '-annotation-body');
@@ -73,6 +88,10 @@ export default class GUIModule {
 		this.events.dispatch('CREATED_ANNOTATION', mesh);
 	}
 
+	/**
+	 * Deletes an annotation, given the mesh that the annotation is attached to
+	 * @param mesh the mesh to delete the annotation from
+	 */
 	public removeAnnotationFromMesh(mesh: AbstractMesh): void {
 		const rect = this.annotations.get(mesh);
 
@@ -83,16 +102,25 @@ export default class GUIModule {
 		}
 	}
 
+	/**
+	 * Deletes an annotation, given the name of the mesh that it is attached to; useful for deleting raw annotations
+	 * @param meshName the name of the mesh to delete the annotation from
+	 */
 	public removeAnnotationByName(meshName: string): void {
 		const mesh = this.scene.getMeshByName(meshName);
 
 		if (mesh) {
 			this.removeAnnotationFromMesh(mesh);
 		} else {
+			// also check if the unloaded annotations have this annotation, because there is no guarantee the name
+			// is of a rendered mesh
 			this.unloadedAnnotations.splice(this.unloadedAnnotations.findIndex((thisAnn) => thisAnn.mesh == meshName));
 		}
 	}
 
+	/**
+	 * Checks the unloaded annotations for any whose meshes have now been rendered, and renders them if necessary
+	 */
 	public checkAnnotations(): void {
 		if (this.unloadedAnnotations.length > 0) {
 			this.unloadedAnnotations.forEach((annotation, i) => {
@@ -105,6 +133,9 @@ export default class GUIModule {
 		}
 	}
 
+	/**
+	 * Checks all annotations for any whose mesh is no longer rendered, and disables them
+	 */
 	public checkVisible(): void {
 		this.annotations.forEach((rect, mesh) => {
 			if (!mesh.isEnabled() && this.isEnabled(rect)) {
@@ -115,6 +146,10 @@ export default class GUIModule {
 		});
 	}
 
+	/**
+	 * Enables the annotation of the given mesh (if it exists)
+	 * @param mesh the mesh whose annotation is to be enabled
+	 */
 	public enableAnnotation(mesh: AbstractMesh): void {
 		const rect = this.annotations.get(mesh);
 
@@ -123,6 +158,10 @@ export default class GUIModule {
 		}
 	}
 
+	/**
+	 * Disables the annotation of the given mesh (if it exists)
+	 * @param mesh the mesh whose annotation is to be disabled
+	 */
 	public disableAnnotation(mesh: AbstractMesh): void {
 		const rect = this.annotations.get(mesh);
 
@@ -131,10 +170,20 @@ export default class GUIModule {
 		}
 	}
 
+	/**
+	 * Checks if the given mesh has an annotation attached to it
+	 * @param mesh the mesh to be checked
+	 * @returns if the mesh has an annotation attached
+	 */
 	public hasAnnotation(mesh: AbstractMesh): boolean {
 		return this.annotations.has(mesh);
 	}
 
+	/**
+	 * Checks if the given annotation is enabled (just returns whether it's visible or not)
+	 * @param ann the annotation to be checked
+	 * @returns if the annotation is currently enabled
+	 */
 	public isEnabled(ann: Rectangle): boolean {
 		return ann.isVisible;
 	}

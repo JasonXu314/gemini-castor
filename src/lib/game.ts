@@ -59,7 +59,7 @@ export default class GameLite {
 	public zAxis: LinesMesh;
 	private optimizer: SceneOptimizer;
 
-	// Caches
+	// Caches for faster repeated sorts (and recalled sorts)
 	private structCache: Record<string, RawStructureCoord[]>;
 	private epiDataCache: Record<string, RenderEpiData>;
 
@@ -211,7 +211,7 @@ export default class GameLite {
 		// this.epiData.renderArcs(Object.values(this.epiData.arcTracks).reduce((arr, track) => [...arr, ...track.data], []));
 		this.epiData.renderArcs(this.epiData.defaultArcData);
 
-		// Loading in existing annotations, but only after things are rendered for the first time
+		// Loading in existing annotations, but only after other meshes are rendered for the first time
 		setTimeout(() => {
 			this.gui.loadAnnotations(annotations);
 		}, 0);
@@ -318,7 +318,7 @@ export default class GameLite {
 			}
 		};
 
-		// Listen for when the user wants to recall a sort (also hijacked for sort sync feature)
+		// Listen for when the user wants to recall a sort
 		this.events.on('RECALL_SORT', (sort: Sort) => {
 			if (sort.radSelect) {
 				this.radSelect.setParams(sort.radSelect);
@@ -335,7 +335,6 @@ export default class GameLite {
 		(window as any).game = this;
 
 		this.events.dispatch('INIT');
-
 		this.logger.log('Initialized');
 	}
 
@@ -692,7 +691,7 @@ export default class GameLite {
 	public async preview(): Promise<void> {
 		// wait for the structure to finish rendering (async because points cloud system)
 		await this.renderStructure.then(() => {
-			// wait 1 frame for stuff to render, to allow annotations to render
+			// wait some time for stuff to render, to allow annotations to render
 			setTimeout(() => {
 				this.scene.render();
 				this.logger.log('Rendering');

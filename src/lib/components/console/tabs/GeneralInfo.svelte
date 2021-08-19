@@ -2,15 +2,18 @@
 	import type GameLite from '$lib/game';
 	import { Vector3 } from '$lib/utils/babylon';
 	import { BACKEND_URL } from '$lib/utils/constants';
+	import { padNum } from '$lib/utils/utils';
 	import axios from 'axios';
 	import Button from '../../Button.svelte';
+
 
 	export let game: GameLite;
 	export let closed: boolean;
 
 	let selectedFeature: EpiDataFeature | null = null,
 		selectedHighlight: RawHighlight | null = null,
-		tempName: string | null = null;
+		tempName: string | null = null,
+		colorString: string | null = null;
 	let hasAnnotation: boolean =
 		selectedFeature === null && selectedHighlight === null
 			? false
@@ -23,6 +26,7 @@
 		if (selectedHighlight) {
 			selectedHighlight = null;
 			tempName = null;
+			colorString = null;
 		}
 	});
 	game.events.on('SELECT_HIGHLIGHT', (highlight: RawHighlight) => {
@@ -36,6 +40,7 @@
 		selectedFeature = null;
 		selectedHighlight = null;
 		tempName = null;
+		colorString = null;
 	});
 
 	$: hasAnnotation =
@@ -44,6 +49,13 @@
 			: game.gui.hasAnnotation(
 					selectedFeature ? selectedFeature.mesh : game.scene.getMeshByName(`highlight-${selectedHighlight.id}`)
 			  );
+
+	$: if (selectedHighlight) {
+		const { r, g, b } = selectedHighlight.color;
+		colorString = `#${padNum((r * 255).toString(16))}${padNum((g * 255).toString(16))}${padNum(
+			(b * 255).toString(16)
+		)}`;
+	}
 
 	game.gui.events.on('CREATED_ANNOTATION', (mesh: Mesh) => {
 		if (selectedFeature && mesh === selectedFeature.mesh) {
@@ -65,6 +77,7 @@
 		if (selectedHighlight && highlight.id === selectedHighlight.id) {
 			selectedHighlight = null;
 			tempName = null;
+			colorString = null;
 		}
 	});
 
@@ -72,6 +85,13 @@
 		if (selectedHighlight && id === selectedHighlight.id) {
 			selectedHighlight = { ...selectedHighlight, name };
 			tempName = name;
+		}
+	});
+
+	game.highlights.events.on('CHANGED_HIGHLIGHT_COLOR', ({ id, color }) => {
+		if (selectedHighlight && id === selectedHighlight.id) {
+			console.log(color);
+			selectedHighlight = { ...selectedHighlight, color };
 		}
 	});
 
@@ -230,6 +250,26 @@
 						<div class="info">{selectedHighlight.params.radius}</div>
 					</div>
 				</div>
+				<div class="middle">
+					<input
+						class="color-input"
+						type="color"
+						on:change={(evt) => {
+							colorString = evt.currentTarget.value;
+							const r = parseInt(colorString.slice(1, 3), 16) / 255;
+							const g = parseInt(colorString.slice(3, 5), 16) / 255;
+							const b = parseInt(colorString.slice(5, 7), 16) / 255;
+
+							game.highlights.changeHighlightColor(selectedHighlight.id, { r, g, b });
+							axios.patch(`${BACKEND_URL}/highlights`, {
+								id: game.rawData.id,
+								_id: selectedHighlight.id,
+								color: { r, g, b }
+							});
+						}}
+						value={colorString}
+					/>
+				</div>
 				<div class="right">
 					<Button type="action" on:click={viewRad}>View</Button>
 					<Button
@@ -287,7 +327,7 @@
 						/>
 					</div>
 					<div class="middle">
-						<h4 class="title">Position</h4>
+						<h4 class="title">Bounds</h4>
 						<div class="info">
 							<div>
 								Min X: {selectedHighlight.params.minX} Min Y: {selectedHighlight.params.minY} Min Z: {selectedHighlight
@@ -299,6 +339,27 @@
 							</div>
 						</div>
 					</div>
+				</div>
+				<div class="middle">
+					<input
+						class="color-input"
+						type="color"
+						on:change={(evt) => {
+							console.log('hi');
+							colorString = evt.currentTarget.value;
+							const r = parseInt(colorString.slice(1, 3), 16) / 255;
+							const g = parseInt(colorString.slice(3, 5), 16) / 255;
+							const b = parseInt(colorString.slice(5, 7), 16) / 255;
+
+							game.highlights.changeHighlightColor(selectedHighlight.id, { r, g, b });
+							axios.patch(`${BACKEND_URL}/highlights`, {
+								id: game.rawData.id,
+								_id: selectedHighlight.id,
+								color: { r, g, b }
+							});
+						}}
+						value={colorString}
+					/>
 				</div>
 				<div class="right">
 					<Button type="action" on:click={viewRad}>View</Button>
@@ -405,5 +466,10 @@
 		border-bottom: 1px solid #cccccc;
 		background: rgba(0, 0, 0, 0);
 		color: white;
+	}
+
+	.color-input {
+		width: 4em;
+		height: 4em;
 	}
 </style>

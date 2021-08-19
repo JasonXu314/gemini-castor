@@ -37,7 +37,12 @@ export function midpoint(pt1: RawVector3, pt2: RawVector3): RawVector3 {
  * @param data extra data to be attached to the point
  * @returns a point, in bounding box form for insertion into RBush
  */
-export function makePoint<T extends BBox>(x: number, y: number, z: number, data?: Omit<T, 'maxX' | 'minX' | 'maxY' | 'minY' | 'maxZ' | 'minZ'>): T {
+export function makePoint<T extends BBox>(
+	x: number,
+	y: number,
+	z: number,
+	data?: Omit<T, 'maxX' | 'minX' | 'maxY' | 'minY' | 'maxZ' | 'minZ'>
+): T {
 	return {
 		minX: x,
 		maxX: x,
@@ -113,14 +118,20 @@ export function compareSorts(a: Sort, b: Sort): boolean {
 			return false;
 		}
 	}
-	if (('conformSelections' in a && !('conformSelections' in b)) || (!('conformSelections' in a) && 'conformSelections' in b)) {
+	if (
+		('conformSelections' in a && !('conformSelections' in b)) ||
+		(!('conformSelections' in a) && 'conformSelections' in b)
+	) {
 		return false;
 	}
 	// @ts-expect-error
 	if (a.conformSelections !== b.conformSelections) {
 		return false;
 	}
-	if (('preserveSelections' in a && !('preserveSelections' in b)) || (!('preserveSelections' in a) && 'preserveSelections' in b)) {
+	if (
+		('preserveSelections' in a && !('preserveSelections' in b)) ||
+		(!('preserveSelections' in a) && 'preserveSelections' in b)
+	) {
 		return false;
 	}
 	// @ts-expect-error
@@ -147,7 +158,9 @@ export function strictCompareVectors(v1: Vector3, v2: Vector3): boolean {
  * @returns true if the vectors are equal
  */
 export function compareVectors(v1: Vector3, v2: Vector3): boolean {
-	return (!v1 && !v2) || (v1 && v2 && Math.abs(v1.x - v2.x) < 1 && Math.abs(v1.y - v2.y) < 1 && Math.abs(v1.z - v2.z) < 1);
+	return (
+		(!v1 && !v2) || (v1 && v2 && Math.abs(v1.x - v2.x) < 1 && Math.abs(v1.y - v2.y) < 1 && Math.abs(v1.z - v2.z) < 1)
+	);
 }
 
 /**
@@ -158,6 +171,17 @@ export function modColor(color: Color3): Color3 {
 	const { r, g, b } = color;
 	const rgbTotal = r * 0.75 + g * 2 + b * 0.75;
 	return new Color3(rgbTotal < 1.75 ? r * 2 : r / 2, rgbTotal < 1.75 ? g * 2 : g / 2, rgbTotal < 1.75 ? b * 2 : b / 2);
+}
+
+/**
+ * Pads a number to be of length 2 (for color stuff) NOTE that num is a string of a number, not a number
+ * @param num the "number" to pad
+ */
+export function padNum(num: string): string {
+	if (num.length < 2) {
+		return '0' + num;
+	}
+	return num;
 }
 
 /**
