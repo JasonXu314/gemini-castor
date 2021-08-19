@@ -139,6 +139,10 @@ export default class HighlightsModule {
 		highlights.forEach((highlight) => this.loadHighlight(highlight));
 	}
 
+	/**
+	 * Sets a general rule for showing highlights, if hidden, overrides individual show/hide status
+	 * @param shown whether tho show highlights or not
+	 */
 	public setHighlightsShown(shown: boolean): void {
 		if (shown !== this.on) {
 			this.on = shown;
@@ -154,6 +158,11 @@ export default class HighlightsModule {
 		}
 	}
 
+	/**
+	 * Shows/Hides a single highlight
+	 * @param id the id of the highlight to show/hide
+	 * @param shown whether to show the highlight or not
+	 */
 	public setShown(id: string, shown: boolean): void {
 		if (this.shown.get(id) !== shown) {
 			this.shown.set(id, shown);
@@ -161,6 +170,10 @@ export default class HighlightsModule {
 		}
 	}
 
+	/**
+	 * Starts the process to create a radius highlight
+	 * @returns A promise that resolves when the user has placed the guide mesh
+	 */
 	public async startRadius(): Promise<void> {
 		return new Promise((resolve, reject) => {
 			if (this.radiusHighlight || this.volumeHighlight) {
@@ -244,6 +257,9 @@ export default class HighlightsModule {
 		this.updateWalls();
 	}
 
+	/**
+	 * Cancels radius/volume highlight, depending on which one is running
+	 */
 	public cancel(): void {
 		if (this.initPos) {
 			this.initPos = false;
@@ -369,6 +385,9 @@ export default class HighlightsModule {
 		);
 	}
 
+	/**
+	 * Resets the highlight setting process (could be duplicate of cancel), dunno
+	 */
 	public reset(): void {
 		this.initPos = false;
 		this.settingParams = false;
@@ -394,6 +413,11 @@ export default class HighlightsModule {
 		}
 	}
 
+	/**
+	 * Updates a coordinate of the center position of the radius highlight
+	 * @param coord the coordinate to update
+	 * @param value the new value of the given coordinate
+	 */
 	public updateRadiusPos(coord: 'x' | 'y' | 'z', value: number): void {
 		if (this.radiusHighlight) {
 			this.radiusHighlight[coord] = value;
@@ -401,6 +425,10 @@ export default class HighlightsModule {
 		}
 	}
 
+	/**
+	 * Updates the radius of the radius highlight
+	 * @param radius the new radius
+	 */
 	public updateRadius(radius: number): void {
 		if (this.radiusHighlight) {
 			this.radiusHighlight.radius = radius;
@@ -408,6 +436,9 @@ export default class HighlightsModule {
 		}
 	}
 
+	/**
+	 * Builds the highlight mesh for a radius highlight from the given parameters
+	 */
 	public createRadiusHighlight(): void {
 		if (this.radiusHighlight) {
 			const id = uuid();
@@ -453,6 +484,9 @@ export default class HighlightsModule {
 		}
 	}
 
+	/**
+	 * Builds the highlight mesh for a volume highlight from the given parameters
+	 */
 	public createVolumeHighlight(): void {
 		if (this.volumeHighlight) {
 			const id = uuid();
@@ -504,6 +538,10 @@ export default class HighlightsModule {
 		}
 	}
 
+	/**
+	 * Deletes a highlight with given id
+	 * @param id The id of the highlight to delete
+	 */
 	public deleteHighlight(id: string): void {
 		if (this.highlights.has(id)) {
 			const mesh = this.highlightMeshes.get(id);
@@ -522,6 +560,11 @@ export default class HighlightsModule {
 		}
 	}
 
+	/**
+	 * Changes the name of the highlight with given id
+	 * @param id the id of the highlight to edit
+	 * @param name the new name of the highlight
+	 */
 	public editHighlight(id: string, name: string): void {
 		if (this.highlights.has(id)) {
 			const highlight = this.highlights.get(id);
@@ -532,6 +575,11 @@ export default class HighlightsModule {
 		}
 	}
 
+	/**
+	 * Changes the color of the highlight with given id
+	 * @param id the id of the highlight to edit
+	 * @param color the new color of the highlight
+	 */
 	public changeHighlightColor(id: string, color: RawColor3): void {
 		if (this.highlights.has(id)) {
 			const highlight = this.highlights.get(id);
