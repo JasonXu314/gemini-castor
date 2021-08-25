@@ -64,6 +64,7 @@
 
 	socket.on('JOIN_LIVE', ({ id, name }) => {
 		participants = [...participants, { id, name }];
+		liveSession.participants = participants;
 
 		if (id === socketId) {
 			inSession = true;
