@@ -472,6 +472,7 @@
 		justify-content: space-around;
 		background-color: rgba(255, 255, 255, 0);
 		transition: background-color linear 500ms;
+		pointer-events: none;
 	}
 
 	.loading.active {
@@ -482,6 +483,7 @@
 	.loading img {
 		opacity: 0;
 		transition: opacity linear 500ms;
+		pointer-events: none;
 	}
 
 	.loading img.active {
