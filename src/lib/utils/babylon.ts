@@ -3,6 +3,7 @@
 // 	ArcRotateCamera,
 // 	Color3,
 // 	Color4,
+// 	Curve3,
 // 	Engine,
 // 	HemisphericLight,
 // 	Mesh,
@@ -39,7 +40,8 @@ const {
 	UniversalCamera,
 	Vector3,
 	VertexData,
-	ArcRotateCamera
+	ArcRotateCamera,
+	Curve3
 } = pkg;
 const { AdvancedDynamicTexture, Rectangle, TextBlock } = gui;
 
@@ -64,5 +66,6 @@ export {
 	AdvancedDynamicTexture,
 	Rectangle,
 	TextBlock,
-	ArcRotateCamera
+	ArcRotateCamera,
+	Curve3
 };

@@ -1,4 +1,13 @@
-import { AbstractMesh, Color3, Mesh, MeshBuilder, StandardMaterial, Vector3, VertexData } from '$lib/utils/babylon';
+import {
+	AbstractMesh,
+	Color3,
+	Curve3,
+	Mesh,
+	MeshBuilder,
+	StandardMaterial,
+	Vector3,
+	VertexData
+} from '$lib/utils/babylon';
 import axios from 'axios';
 import type GUIModule from './gui';
 import type StructureModule from './structure';
@@ -188,13 +197,26 @@ export default class EpiDataModule {
 					: this.structure.data.slice(flag.startTag, flag.stopTag)
 			).map(({ x, y, z }) => new Vector3(x, y, z));
 
+			// scaling value for flag height/width
+			const scale = 50 * flag.value / this.flagTracks[flag.id].max;
+
+			// shape for flag mesh
+			const shape = [
+				new Vector3(-1, 0, 0).scale(scale),
+				new Vector3(-1, 5, 0).scale(scale),
+				new Vector3(1, 5, 0).scale(scale),
+				new Vector3(1, 0, 0).scale(scale),
+				new Vector3(-1, 0, 0).scale(scale)
+			];
+
 			const flagIndex = this.flagIndexMap.get(flag);
 			const flagName = `flag-${flagIndex}`;
-			const mesh = MeshBuilder.CreateTube(
+			const mesh = MeshBuilder.ExtrudeShape(
 				flagName,
 				{
-					path: path,
-					radius: Math.log(flag.value + 5) * 20,
+					shape,
+					path,
+					sideOrientation: Mesh.DOUBLESIDE,
 					cap: Mesh.CAP_ALL,
 					updatable: true
 				},
@@ -332,19 +354,39 @@ export default class EpiDataModule {
 				  ];
 			const arcIndex = this.arcIndexMap.get(arc);
 
+			// Scale of arc line mesh
+			const scale = 50;
+
+			// path of line
+			const path = Curve3.CreateCatmullRomSpline(lines, 10, false).getPoints();
+
+			// Defines shape that will be extruded
+			const shape = [
+				new Vector3(1, 1, 0),
+				new Vector3(0, 0, 0),
+				new Vector3(0, 1, 0),
+				new Vector3(-0.2, 1.3, 0),
+				new Vector3(-1, 1, 0)
+			];
+
 			const linesName = `arc-${arcIndex}-lines`;
-			const linesMesh = MeshBuilder.CreateLines(
+			const { r: lmr, g: lmg, b: lmb } = this.arcTracks[arc.id].color;
+
+			const linesMat = new StandardMaterial('arc-lines-mat', this.scene);
+			linesMat.diffuseColor = new Color3(lmr / 255, lmg / 255, lmb / 255);
+			const linesMesh = MeshBuilder.ExtrudeShape(
 				linesName,
 				{
-					points: lines,
+					shape,
+					path,
+					rotation: Math.PI / 3,
+					scale,
+					sideOrientation: Mesh.DOUBLESIDE,
 					updatable: true
 				},
 				this.scene
 			);
-			linesMesh.isPickable = false;
-
-			const { r: lmr, g: lmg, b: lmb } = this.arcTracks[arc.id].color;
-			linesMesh.color = new Color3(lmr / 255, lmg / 255, lmb / 255);
+			linesMesh.material = linesMat;
 
 			// Optimize
 			// mesh.freezeWorldMatrix();

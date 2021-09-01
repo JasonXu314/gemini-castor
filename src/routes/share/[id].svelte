@@ -16,8 +16,7 @@
 	let canvas: HTMLCanvasElement,
 		game: GameLite,
 		sortHist: Sort[] = [],
-		sortsActive: boolean = false,
-		fetching: boolean = false,
+		loading: boolean = false,
 		settingAnnotation: boolean = false,
 		annotationName: string = '',
 		socketId: string,
@@ -81,7 +80,7 @@
 	onMount(tryFetch);
 
 	function tryFetch() {
-		if (id && !game && !fetching) {
+		if (id && !game && !loading) {
 			axios.get<Model & { socketId: string }>(`${BACKEND_URL}/models/${id}`).then((res) => {
 				Promise.all([
 					axios.get<Blob>(`${BACKEND_URL}/${id}.gref`, { responseType: 'blob' }).then((res) => {
@@ -136,16 +135,13 @@
 					sortHist = res.data.sortHist;
 					viewStore.set(res.data.views);
 					game.start();
+					loading = false;
 					game.events.on('RESET', (sort) => {
 						if (!sortHist.some((existingSort) => compareSorts(existingSort, sort))) {
 							sortHist = [...sortHist, sort];
 							axios.post<Sort[]>(`${BACKEND_URL}/history`, { sort, id });
 							game.sortsDone++;
 						}
-						sortsActive = false;
-					});
-					game.events.on('ACTIVE', () => {
-						sortsActive = true;
 					});
 					game.events.on('START_SET_ANN_NAME', (defName: string) => {
 						settingAnnotation = true;
@@ -289,7 +285,7 @@
 					}
 				});
 			});
-			fetching = true;
+			loading = true;
 		} else if (!id) {
 			console.log(`Model id undefined: ${id}`);
 		}
@@ -403,6 +399,9 @@
 			/>
 		{/each}
 	</div>
+	<div class="loading" class:active={loading}>
+		<img src="/images/dna.gif" alt="Loading..." class:active={loading} />
+	</div>
 </div>
 
 <style>
@@ -460,5 +459,33 @@
 		left: 0;
 		display: flex;
 		flex-direction: column;
+	}
+
+	.loading {
+		position: absolute;
+		top: 0;
+		left: 0;
+		height: 100vh;
+		width: 100vw;
+		display: flex;
+		flex-direction: row;
+		justify-content: space-around;
+		background-color: rgba(255, 255, 255, 0);
+		transition: background-color linear 500ms;
+	}
+
+	.loading.active {
+		background-color: rgba(255, 255, 255, 1);
+		transition: background-color linear 500ms;
+	}
+
+	.loading img {
+		opacity: 0;
+		transition: opacity linear 500ms;
+	}
+
+	.loading img.active {
+		opacity: 1;
+		transition: opacity linear 500ms;
 	}
 </style>
