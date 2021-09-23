@@ -93,11 +93,7 @@ export default class RadiusSelectorModule {
 		this.noControl = noControl;
 		return new Promise((resolve, reject) => {
 			// Create guidance mesh
-			const guideMesh = MeshBuilder.CreateSphere(
-				'sphericalbound',
-				{ segments: 8, diameter: 2, updatable: true },
-				this.scene
-			);
+			const guideMesh = MeshBuilder.CreateSphere('sphericalbound', { segments: 8, diameter: 2, updatable: true }, this.scene);
 			guideMesh.material = new StandardMaterial('guideballmaterial', this.scene);
 			guideMesh.material.wireframe = true;
 			guideMesh.scaling = new Vector3(300, 300, 300);
@@ -151,9 +147,7 @@ export default class RadiusSelectorModule {
 		});
 
 		// Refine rough selection of points by verifying
-		const results = dataArray
-			.filter((pt) => distance({ x: pt.minX, y: pt.minY, z: pt.minZ }, position) < radius)
-			.map<RawStructureCoord>((point) => point.raw);
+		const results = dataArray.filter((pt) => distance({ x: pt.minX, y: pt.minY, z: pt.minZ }, position) < radius).map<RawStructureCoord>((point) => point.raw);
 
 		this.structCache[keyStr] = results;
 
@@ -365,6 +359,13 @@ export default class RadiusSelectorModule {
 		if (this.game.hoverMesh) {
 			this.guideMesh.position = this.game.hoverMesh.getBoundingInfo().boundingSphere.center.clone();
 			this.radius = this.game.hoverMesh.getBoundingInfo().boundingSphere.radius;
+			this.position = this.guideMesh.position;
+			this.guideMesh.scaling = new Vector3(this.radius, this.radius, this.radius);
+			const { x, y, z } = this.position;
+			this.events.dispatch('PARAMS_CHANGE', { position: { x, y, z }, radius: this.radius });
+		} else if (this.game.selectedMesh) {
+			this.guideMesh.position = this.game.selectedMesh.getBoundingInfo().boundingSphere.center.clone();
+			this.radius = this.game.selectedMesh.getBoundingInfo().boundingSphere.radius;
 			this.position = this.guideMesh.position;
 			this.guideMesh.scaling = new Vector3(this.radius, this.radius, this.radius);
 			const { x, y, z } = this.position;
